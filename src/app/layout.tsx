@@ -1,11 +1,11 @@
 import "./globals.css";
-import { RoomProvider } from "./store/RoomContext";
+import { RoomHistoryProvider } from "./state/RoomHistoryContext";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <RoomProvider>{children}</RoomProvider>
+        <RoomHistoryProvider>{children}</RoomHistoryProvider>
       </body>
     </html>
   );

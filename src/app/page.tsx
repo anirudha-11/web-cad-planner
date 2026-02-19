@@ -2,7 +2,6 @@
 
 import EditorViewport2D from "./components/EditorViewport2D";
 import { Group, Panel, Separator } from "react-resizable-panels";
-import { useRef } from "react";
 
 
 function Handle({ vertical }: { vertical: boolean }) {

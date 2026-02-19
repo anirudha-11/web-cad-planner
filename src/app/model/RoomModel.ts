@@ -1,3 +1,5 @@
+import type { EntityMap } from "../core/entities/entityTypes";
+
 export type Vec2 = { x: number; y: number };
 
 export type RoomModel = {
@@ -10,6 +12,9 @@ export type RoomModel = {
   wallThickness: number; // mm
   wallHeight: number; // mm
   dimText?: Record<number, string>;
+
+  // Future-proof: doors/windows/fixtures/annotations etc.
+  entities: EntityMap;
 };
 
 
@@ -29,6 +34,7 @@ export const createDefaultRoom = (): RoomModel => {
     ],
     wallThickness: 90,
     wallHeight: 2400,
+    entities: {},
   };
 };
 

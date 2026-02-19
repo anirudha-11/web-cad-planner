@@ -1,10 +1,9 @@
-import type { DraftScene } from "./draftPrimitives";
-import type { RoomModel } from "../model/RoomModel";
-import type { ViewKind } from "../components/EditorViewport2D";
-import { offsetOrthoLoop } from "./offsetOrthoLoop";
-// import type { Vec2 } from "./Viewport2D";
-import type { Vec2 } from "./draftPrimitives";
-import { DIMENSION_DEFAULTS } from "./dimensionDefaults";
+import type { DraftScene } from "../../editor2D/draftPrimitives";
+import type { RoomModel } from "../../model/RoomModel";
+import type { ViewKind } from "../view/ViewKind";
+import { offsetOrthoLoop } from "../../editor2D/offsetOrthoLoop";
+import type { Vec2 } from "../../editor2D/draftPrimitives";
+import { DIMENSION_DEFAULTS } from "../../editor2D/dimensionDefaults";
 
 export function deriveDraftScene(view: ViewKind, room: RoomModel): DraftScene {
   if (view === "plan") return derivePlanScene(room);
@@ -20,10 +19,6 @@ function derivePlanScene(room: RoomModel): DraftScene {
   const wallFill = "rgb(255, 255, 255)";
   const outline = "rgba(0,0,0,0.9)";
 
-  // For labels: use bounds of inner
-  const b = bounds(inner);
-
-  // ✅ Build primitives array first
   const primitives: DraftScene["primitives"] = [
     {
       kind: "polygon" as const,
@@ -35,7 +30,6 @@ function derivePlanScene(room: RoomModel): DraftScene {
     },
   ];
 
-  // ✅ Dimensions (one per segment of innerLoop)
   const dimOffset = DIMENSION_DEFAULTS.offsetMm;
   const dimStroke = { color: "rgba(0,0,0,0.8)", widthMm: 1 };
 
@@ -59,12 +53,14 @@ function derivePlanScene(room: RoomModel): DraftScene {
     });
   }
 
-
   return { primitives };
 }
 
 function bounds(loop: Vec2[]) {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   for (const p of loop) {
     minX = Math.min(minX, p.x);
     minY = Math.min(minY, p.y);
@@ -74,14 +70,10 @@ function bounds(loop: Vec2[]) {
   return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
 }
 
-
 function deriveElevationScene(view: Exclude<ViewKind, "plan">, room: RoomModel): DraftScene {
   const L = wallLengthFor(view, room);
   const H = room.wallHeight;
 
-  // Elevation coordinate system:
-  // x = along wall length, y = height (AFF)
-  // origin at (0,0)
   const frame = {
     kind: "polyline" as const,
     pts: [
@@ -94,7 +86,6 @@ function deriveElevationScene(view: Exclude<ViewKind, "plan">, room: RoomModel):
     stroke: { color: "rgba(0, 0, 0, 0.85)", widthMm: 0.25 },
   };
 
-  // Example: a “tile band” (0..1200 high) – matches the kind of output you want later
   const tileBand = {
     kind: "polyline" as const,
     pts: [
@@ -112,17 +103,19 @@ function deriveElevationScene(view: Exclude<ViewKind, "plan">, room: RoomModel):
     primitives: [
       frame,
       tileBand,
-      { kind: "text", at: { x: 0, y: H + 200 }, text: `L=${Math.round(L)}  H=${Math.round(H)}`, sizeMm: 90, color: "rgba(0, 0, 0, 0.65)" },
+      {
+        kind: "text",
+        at: { x: 0, y: H + 200 },
+        text: `L=${Math.round(L)}  H=${Math.round(H)}`,
+        sizeMm: 90,
+        color: "rgba(0, 0, 0, 0.65)",
+      },
     ],
   };
 }
 
-function wallLengthFor(view: "north" | "south" | "east" | "west", room: RoomModel) {
+function wallLengthFor(view: Exclude<ViewKind, "plan">, room: RoomModel) {
   const b = bounds(room.innerLoop);
-
-  // For axis-aligned loops:
-  // North/South span X range
-  // East/West span Y range
   if (view === "north" || view === "south") return b.width;
   return b.height;
 }
