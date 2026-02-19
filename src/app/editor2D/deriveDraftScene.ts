@@ -59,14 +59,6 @@ function derivePlanScene(room: RoomModel): DraftScene {
     });
   }
 
-  // ✅ Info label
-  // primitives.push({
-  //   kind: "text" as const,
-  //   at: { x: b.minX, y: b.maxY + 200 },
-  //   text: `W=${Math.round(b.width)}  D=${Math.round(b.height)}  T=${Math.round(t)}`,
-  //   sizeMm: 40,
-  //   color: "rgba(0,0,0,0.45)",
-  // });
 
   return { primitives };
 }
@@ -120,7 +112,6 @@ function deriveElevationScene(view: Exclude<ViewKind, "plan">, room: RoomModel):
     primitives: [
       frame,
       tileBand,
-      // { kind: "text", at: { x: 0, y: -200 }, text: `ELEVATION ${view.toUpperCase()}`, sizeMm: 120, color: "rgba(0, 0, 0, 0.85)" },
       { kind: "text", at: { x: 0, y: H + 200 }, text: `L=${Math.round(L)}  H=${Math.round(H)}`, sizeMm: 90, color: "rgba(0, 0, 0, 0.65)" },
     ],
   };

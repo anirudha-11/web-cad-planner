@@ -11,13 +11,13 @@ import type { RoomModel } from "../model/RoomModel";
 import { DIMENSION_DEFAULTS } from "../editor2D/dimensionDefaults";
 import { DraftPrimitive } from "../editor2D/draftPrimitives";
 
-// use DIMENSION_DEFAULTS.offsetMm etc.
-
-
 export type ViewKind = "plan" | "north" | "south" | "east" | "west";
 
 type Vec2 = { x: number; y: number };
 type ScreenPt = { x: number; y: number };
+type Axis = "x" | "y";
+
+const EPS = 1e-6;
 
 export default function EditorViewport2D({ view, title }: { view: ViewKind; title?: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -52,11 +52,6 @@ const openDimEditorFromDim = (d: Extract<DraftPrimitive, { kind: "dimension" }>)
     screen: labelScreen, // ✅ exact label position
   });
 };
-
-
-const DIM_OFFSET_MM = DIMENSION_DEFAULTS.offsetMm;     
-const DIM_TEXT_SIZE_MM = DIMENSION_DEFAULTS.textSizeMm;   
-const DIM_SIDE = DIMENSION_DEFAULTS.side;
 
 function dimLabelWorldPos(d: { a: Vec2; b: Vec2; offsetMm: number; side?: "in" | "out" }): Vec2 {
   const a = d.a, b = d.b;
@@ -290,26 +285,24 @@ useEffect(() => {
         const { segIndex, startWorld, startLoop } = dragRef.current;
         const pWorld = screenToWorldFromEvent(e);
 
-        const dx = pWorld.x - startWorld.x;
-        const dy = pWorld.y - startWorld.y;
+        const dxW = pWorld.x - startWorld.x;
+        const dyW = pWorld.y - startWorld.y;
 
-        const n = startLoop.length;
-        const i0 = segIndex;
-        const i1 = (segIndex + 1) % n;
+        // Determine which wall line we’re moving (perpendicular to segment direction)
+        const { axis, coord } = segLineCoord(startLoop, segIndex);
 
-        const a0 = startLoop[i0];
-        const b0 = startLoop[i1];
-        const horizontal = Math.abs(a0.y - b0.y) <= Math.abs(a0.x - b0.x);
-
-        const moveX = horizontal ? 0 : dx;
-        const moveY = horizontal ? dy : 0;
+        // For a horizontal segment => axis is "y" (we move y by dyW)
+        // For a vertical segment   => axis is "x" (we move x by dxW)
+        const delta = axis === "x" ? dxW : dyW;
 
         setRoom((prev: RoomModel) => {
-          const loop = startLoop.map((p) => ({ ...p }));
-          loop[i0] = { x: loop[i0].x + moveX, y: loop[i0].y + moveY };
-          loop[i1] = { x: loop[i1].x + moveX, y: loop[i1].y + moveY };
-          const next = { ...prev, innerLoop: loop };
-          return clearDimOverridesForDrag(next, segIndex);
+          // We intentionally apply the move to the snapshot captured on pointer-down (startLoop)
+          // so the drag stays stable even if prev changes mid-drag.
+          const { loop: movedLoop, movedVertexIdxs } = moveWallLine(startLoop, axis, coord, delta);
+
+          // keep prev's other properties, but replace the loop
+          const next = { ...prev, innerLoop: movedLoop };
+          return clearDimOverridesForMovedVertices(next, movedVertexIdxs);
         });
 
         return;
@@ -362,7 +355,7 @@ useEffect(() => {
 
     return () => {
       canvas.removeEventListener("contextmenu", onContextMenu);
-      canvas.removeEventListener("wheel", onWheel as any);
+      canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);
@@ -374,81 +367,150 @@ useEffect(() => {
   const commitDimEdit = (segIndex: number, raw: string) => {
   const cleaned = raw.trim();
 
-  // Always store what user typed as the displayed label
+  // Store label text always
   setRoom((prev) => ({
     ...prev,
     dimText: { ...(prev.dimText ?? {}), [segIndex]: cleaned },
   }));
 
-  // If it's a number, also apply as actual length (mm)
+  // If numeric, apply geometry edit
   const n = Number(cleaned);
   if (!Number.isFinite(n) || n <= 0) return;
 
-  setRoom((prev) => applySegmentLength_RectOnly(prev, segIndex, n));
+  setRoom((prev) => applySegmentLength_Ortho(prev, segIndex, n));
 };
 
-function applySegmentLength_RectOnly(room: RoomModel, segIndex: number, newLen: number): RoomModel {
-  const loop = room.innerLoop.map((p) => ({ ...p }));
-  if (loop.length !== 4) return room; // ✅ keep safe for now
-
-  const p0 = loop[0], p1 = loop[1], p2 = loop[2], p3 = loop[3];
-
-  // Detect if it’s axis-aligned rectangle-ish
-  const isAxisAligned =
-    (p0.y === p1.y && p1.x === p2.x && p2.y === p3.y && p3.x === p0.x);
-
-  if (!isAxisAligned) return room;
-
-  // Segment mapping (clockwise):
-  // 0: p0->p1 (top, width)
-  // 1: p1->p2 (right, depth)
-  // 2: p2->p3 (bottom, width)
-  // 3: p3->p0 (left, depth)
-
-  if (segIndex === 0 || segIndex === 2) {
-    // width: keep left side anchored at x = p0.x, move right side
-    const xL = p0.x;
-    const xR = xL + newLen;
-
-    loop[1].x = xR; // p1
-    loop[2].x = xR; // p2
-  } else if (segIndex === 1 || segIndex === 3) {
-    // depth: keep top side anchored at y = p0.y, move bottom side
-    const yT = p0.y;
-    const yB = yT + newLen;
-
-    loop[2].y = yB; // p2
-    loop[3].y = yB; // p3
-  }
-
-  return { ...room, innerLoop: loop };
-}
-
-function clearDimOverridesForDrag(room: RoomModel, draggedSegIndex: number): RoomModel {
+function clearDimOverridesForMovedVertices(
+  room: RoomModel,
+  movedVertexIdxs: number[],
+  keepSegs: Set<number> = new Set()
+): RoomModel {
   const map = { ...(room.dimText ?? {}) };
   if (!Object.keys(map).length) return room;
 
-  // For your current rectangle workflow:
-  // dragging a vertical edge changes width (segments 0 & 2)
-  // dragging a horizontal edge changes depth (segments 1 & 3)
-  const n = room.innerLoop.length;
-  if (n !== 4) {
-    // safe fallback: clear just the dragged segment override
-    delete map[draggedSegIndex];
-    return { ...room, dimText: map };
-  }
+  const touchedSegs = movedVerticesToTouchedSegments(room.innerLoop.length, movedVertexIdxs);
 
-  if (draggedSegIndex === 1 || draggedSegIndex === 3) {
-    // moved vertical edge => width changes => clear top & bottom labels
-    delete map[0];
-    delete map[2];
-  } else if (draggedSegIndex === 0 || draggedSegIndex === 2) {
-    // moved horizontal edge => depth changes => clear left & right labels
-    delete map[1];
-    delete map[3];
+  for (const seg of touchedSegs) {
+    if (keepSegs.has(seg)) continue;
+    delete map[seg];
   }
 
   return { ...room, dimText: map };
+}
+
+function applySegmentLength_Ortho(room: RoomModel, segIndex: number, newLen: number): RoomModel {
+  const loop0 = room.innerLoop;
+  if (loop0.length < 2) return room;
+
+  const { loop: movedLoop, movedVertexIdxs } = setSegmentLength_Ortho(loop0, segIndex, newLen);
+
+  // Clear overrides for any touched segments EXCEPT the one the user just edited
+  const keep = new Set<number>([segIndex]);
+  const next: RoomModel = { ...room, innerLoop: movedLoop };
+  return clearDimOverridesForMovedVertices(next, movedVertexIdxs, keep);
+}
+
+
+function nearlyEqual(a: number, b: number, eps = EPS) {
+  return Math.abs(a - b) <= eps;
+}
+
+function segDir(loop: Vec2[], segIndex: number): "h" | "v" {
+  const n = loop.length;
+  const a = loop[segIndex];
+  const b = loop[(segIndex + 1) % n];
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  // choose dominant axis (and tolerate tiny noise)
+  return Math.abs(dx) >= Math.abs(dy) ? "h" : "v";
+}
+
+function segLineCoord(loop: Vec2[], segIndex: number): { axis: Axis; coord: number } {
+  const n = loop.length;
+  const a = loop[segIndex];
+  const b = loop[(segIndex + 1) % n];
+  const dir = segDir(loop, segIndex);
+  if (dir === "h") {
+    // horizontal => constant y
+    return { axis: "y", coord: (a.y + b.y) * 0.5 };
+  }
+  // vertical => constant x
+  return { axis: "x", coord: (a.x + b.x) * 0.5 };
+}
+
+function verticesOnLine(loop: Vec2[], axis: Axis, coord: number, eps = EPS) {
+  const idxs: number[] = [];
+  for (let i = 0; i < loop.length; i++) {
+    const v = loop[i];
+    const c = axis === "x" ? v.x : v.y;
+    if (nearlyEqual(c, coord, eps)) idxs.push(i);
+  }
+  return idxs;
+}
+
+function movedVerticesToTouchedSegments(loopLen: number, movedVertexIdxs: number[]) {
+  // segment i is between vertex i and i+1
+  const moved = new Set(movedVertexIdxs);
+  const touchedSegs = new Set<number>();
+
+  for (let i = 0; i < loopLen; i++) {
+    const i0 = i;
+    const i1 = (i + 1) % loopLen;
+    if (moved.has(i0) || moved.has(i1)) touchedSegs.add(i);
+  }
+  return touchedSegs;
+}
+
+function translateVertices(loop: Vec2[], idxs: number[], dx: number, dy: number) {
+  const out = loop.map((p) => ({ ...p }));
+  for (const i of idxs) {
+    out[i] = { x: out[i].x + dx, y: out[i].y + dy };
+  }
+  return out;
+}
+
+/**
+ * Move an entire wall line (all vertices with x=const or y=const).
+ * - axis "x": moves a vertical wall line by dx
+ * - axis "y": moves a horizontal wall line by dy
+ */
+function moveWallLine(loop: Vec2[], axis: Axis, coord: number, delta: number) {
+  const vIdxs = verticesOnLine(loop, axis, coord);
+  const dx = axis === "x" ? delta : 0;
+  const dy = axis === "y" ? delta : 0;
+  return {
+    loop: translateVertices(loop, vIdxs, dx, dy),
+    movedVertexIdxs: vIdxs,
+  };
+}
+
+/**
+ * Stretch along segment tangent by moving the "far end" wall line.
+ * For a horizontal segment (a->b), length = |bx-ax|.
+ * We keep the "anchor end" (a side) fixed and move the "far end" wall line (b side).
+ * This generalizes rectangle to any orthogonal polygon by shifting ALL vertices on that end-line.
+ */
+function setSegmentLength_Ortho(loop: Vec2[], segIndex: number, newLen: number) {
+  const n = loop.length;
+  if (n < 2) return { loop, movedVertexIdxs: [] as number[] };
+
+  const a = loop[segIndex];
+  const b = loop[(segIndex + 1) % n];
+
+  const dir = segDir(loop, segIndex);
+  if (dir === "h") {
+    // move the vertical line at x = b.x to make |bx-ax| = newLen
+    const sign = (b.x - a.x) >= 0 ? 1 : -1;
+    const targetBx = a.x + sign * newLen;
+    const dx = targetBx - b.x;
+    return moveWallLine(loop, "x", b.x, dx);
+  } else {
+    // vertical: move the horizontal line at y = b.y to make |by-ay| = newLen
+    const sign = (b.y - a.y) >= 0 ? 1 : -1;
+    const targetBy = a.y + sign * newLen;
+    const dy = targetBy - b.y;
+    return moveWallLine(loop, "y", b.y, dy);
+  }
 }
 
 
