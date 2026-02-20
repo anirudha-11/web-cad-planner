@@ -23,7 +23,7 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
   const [version, setVersion] = useState(0);
 
   const { room, execute, previewRoom, commitSnapshot, undo, redo, canUndo, canRedo } = useRoomHistory();
-  const { mode: toolMode, hatchConfig, hoverZoneId, setHoverZoneId } = useTool();
+  const { mode: toolMode, hatchConfig, hoverZoneId, setHoverZoneId, zoomExtentsTrigger } = useTool();
 
   const [hoverSeg, setHoverSeg] = useState<number | null>(null);
   const [selectedSeg, setSelectedSeg] = useState<number | null>(null);
@@ -188,6 +188,12 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, room.id]);
 
+  // React to toolbar "Zoom to fit" (all viewports zoom)
+  useEffect(() => {
+    if (zoomExtentsTrigger > 0) zoomExtents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoomExtentsTrigger]);
+
   // Resize observer
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -260,34 +266,6 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
 
   return (
     <div className="relative w-full h-full bg-[#ffffff] overflow-hidden">
-      <div className="absolute left-2 top-2 z-10 text-xs text-black/55 select-none pointer-events-none">
-        {title ?? view.toUpperCase()}
-      </div>
-      <div className="absolute right-2 top-2 z-10 flex gap-1">
-        <button
-          className="px-2 py-1 text-[11px] rounded bg-black/5 hover:bg-black/10 text-black/70 disabled:opacity-40 disabled:cursor-default"
-          onClick={undo}
-          disabled={!canUndo}
-          title="Undo (Ctrl/Cmd+Z)"
-        >
-          Undo
-        </button>
-        <button
-          className="px-2 py-1 text-[11px] rounded bg-black/5 hover:bg-black/10 text-black/70 disabled:opacity-40 disabled:cursor-default"
-          onClick={redo}
-          disabled={!canRedo}
-          title="Redo (Ctrl+Shift+Z / Ctrl+Y)"
-        >
-          Redo
-        </button>
-        <button
-          className="px-2 py-1 text-[11px] rounded bg-black/5 hover:bg-black/10 text-black/70"
-          onClick={zoomExtents}
-          title="Zoom Extents"
-        >
-          Zoom to fit
-        </button>
-      </div>
       {dimEdit && (
         <div
           className="absolute z-20"

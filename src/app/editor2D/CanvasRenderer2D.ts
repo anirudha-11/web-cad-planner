@@ -95,7 +95,7 @@ export class CanvasRenderer2D {
     const drawMinor = minorPx >= 6;
 
     if (drawMinor) {
-      ctx.strokeStyle = "rgba(0, 0, 0, 0.05)";
+      ctx.strokeStyle = "rgba(100, 149, 237, 0.14)"; // minor grid: light blue-gray
       ctx.lineWidth = 1;
       ctx.setLineDash([]);
 
@@ -122,7 +122,7 @@ export class CanvasRenderer2D {
       }
     }
 
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.1)";
+    ctx.strokeStyle = "rgba(100, 149, 237, 0.28)"; // major grid: blue-gray
     ctx.lineWidth = 1;
     ctx.setLineDash([]);
 

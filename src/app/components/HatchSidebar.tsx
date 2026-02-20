@@ -9,10 +9,10 @@ export default function HatchSidebar() {
   const activeDef = getPatternDef(hatchConfig.patternId as HatchPatternId);
 
   return (
-    <div className="w-56 bg-neutral-900 border-r border-white/10 flex flex-col shrink-0 overflow-y-auto text-neutral-200">
+    <div className="w-52 border-l border-gray-200 flex flex-col text-gray-700 max-h-[70vh] overflow-y-auto shrink-0">
       {/* Pattern grid */}
       <div className="px-3 pt-3 pb-1">
-        <h3 className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-2">
+        <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
           Patterns
         </h3>
         <div className="grid grid-cols-3 gap-1.5">
@@ -24,10 +24,10 @@ export default function HatchSidebar() {
                 title={p.name}
                 onClick={() => selectPattern(p.id)}
                 className={[
-                  "aspect-square rounded border transition-all flex items-center justify-center",
+                  "aspect-square rounded-md border transition-all flex items-center justify-center",
                   active
-                    ? "border-blue-500 ring-1 ring-blue-500/50"
-                    : "border-white/10 hover:border-white/30",
+                    ? "border-blue-500 ring-1 ring-blue-500/40 shadow-sm"
+                    : "border-gray-200 hover:border-gray-300",
                 ].join(" ")}
               >
                 <PatternSwatch
@@ -42,15 +42,15 @@ export default function HatchSidebar() {
       </div>
 
       {/* Active pattern label */}
-      <div className="px-3 pt-2 pb-1">
-        <span className="text-xs text-neutral-400">{activeDef?.name ?? "None"}</span>
+      <div className="px-3 pt-1.5 pb-1">
+        <span className="text-[11px] text-gray-400">{activeDef?.name ?? "None"}</span>
       </div>
 
-      <div className="h-px bg-white/10 mx-3 my-1" />
+      <div className="h-px bg-gray-100 mx-3 my-1" />
 
       {/* Customization */}
       <div className="px-3 py-2 flex flex-col gap-2.5 text-[11px]">
-        <h3 className="font-semibold text-neutral-400 uppercase tracking-wider">
+        <h3 className="font-semibold text-gray-400 uppercase tracking-wider text-[10px]">
           Customize
         </h3>
 
@@ -116,10 +116,8 @@ export default function HatchSidebar() {
         </Field>
       </div>
 
-      <div className="flex-1" />
-
-      <div className="px-3 py-3 text-[10px] text-neutral-500 leading-relaxed">
-        Hover over a zone to preview, click to apply.
+      <div className="px-3 py-2 text-[10px] text-gray-400 leading-relaxed">
+        Hover a zone to preview, click to apply.
       </div>
     </div>
   );
@@ -128,7 +126,7 @@ export default function HatchSidebar() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-neutral-400">{label}</span>
+      <span className="text-gray-500">{label}</span>
       {children}
     </label>
   );
@@ -152,9 +150,9 @@ function ColorInput({
         type="color"
         value={htmlColor}
         onChange={(e) => onChange(e.target.value)}
-        className="w-7 h-7 rounded border border-white/20 bg-transparent cursor-pointer p-0"
+        className="w-7 h-7 rounded border border-gray-200 bg-white cursor-pointer p-0"
       />
-      <span className="text-neutral-400 text-[10px] font-mono flex-1 truncate">
+      <span className="text-gray-400 text-[10px] font-mono flex-1 truncate">
         {isTransparent ? "transparent" : htmlColor}
       </span>
       {allowTransparent && (
@@ -163,8 +161,8 @@ function ColorInput({
           className={[
             "px-1.5 py-0.5 rounded text-[9px] border",
             isTransparent
-              ? "border-blue-500 text-blue-400"
-              : "border-white/15 text-neutral-500 hover:text-neutral-300",
+              ? "border-blue-500 text-blue-500"
+              : "border-gray-200 text-gray-400 hover:text-gray-600",
           ].join(" ")}
         >
           {isTransparent ? "Clear" : "None"}
@@ -191,7 +189,7 @@ function PatternSwatch({
       style={{
         backgroundImage: cssPreview,
         backgroundSize: size,
-        backgroundColor: patternId === "none" ? "#1a1a1a" : undefined,
+        backgroundColor: patternId === "none" ? "#f3f4f6" : undefined,
       }}
     />
   );

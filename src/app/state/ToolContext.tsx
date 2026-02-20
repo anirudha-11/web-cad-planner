@@ -14,6 +14,8 @@ type ToolContextValue = {
   selectPattern: (patternId: HatchPatternId) => void;
   hoverZoneId: string | null;
   setHoverZoneId: (id: string | null) => void;
+  zoomExtentsTrigger: number;
+  requestZoomExtents: () => void;
 };
 
 const ToolContext = createContext<ToolContextValue | null>(null);
@@ -22,6 +24,7 @@ export function ToolProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeRaw] = useState<ToolMode>("select");
   const [hatchConfig, setHatchConfig] = useState<HatchConfig>(defaultConfigFor("diagonal-right"));
   const [hoverZoneId, setHoverZoneId] = useState<string | null>(null);
+  const [zoomExtentsTrigger, setZoomExtentsTrigger] = useState(0);
 
   const setMode = useCallback((m: ToolMode) => {
     setModeRaw(m);
@@ -41,9 +44,13 @@ export function ToolProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const requestZoomExtents = useCallback(() => {
+    setZoomExtentsTrigger((n) => n + 1);
+  }, []);
+
   const value = useMemo<ToolContextValue>(
-    () => ({ mode, setMode, hatchConfig, setHatchConfig, selectPattern, hoverZoneId, setHoverZoneId }),
-    [mode, setMode, hatchConfig, selectPattern, hoverZoneId],
+    () => ({ mode, setMode, hatchConfig, setHatchConfig, selectPattern, hoverZoneId, setHoverZoneId, zoomExtentsTrigger, requestZoomExtents }),
+    [mode, setMode, hatchConfig, selectPattern, hoverZoneId, zoomExtentsTrigger, requestZoomExtents],
   );
 
   return <ToolContext.Provider value={value}>{children}</ToolContext.Provider>;

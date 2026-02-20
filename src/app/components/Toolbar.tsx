@@ -1,6 +1,9 @@
 "use client";
 
+import React, { useCallback, useRef, useState } from "react";
 import { useTool, type ToolMode } from "../state/ToolContext";
+import { useRoomHistory } from "../state/RoomHistoryContext";
+import HatchSidebar from "./HatchSidebar";
 
 const tools: { id: ToolMode; label: string; icon: React.ReactNode }[] = [
   {
@@ -34,25 +37,111 @@ const tools: { id: ToolMode; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function Toolbar() {
-  const { mode, setMode } = useTool();
+  const { mode, setMode, requestZoomExtents } = useTool();
+  const { undo, redo, canUndo, canRedo } = useRoomHistory();
+
+  const [pos, setPos] = useState({ x: 16, y: 16 });
+  const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+
+  const onGripDown = useCallback(
+    (e: React.PointerEvent) => {
+      dragRef.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [pos],
+  );
+
+  const onGripMove = useCallback((e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    setPos({ x: d.ox + e.clientX - d.sx, y: d.oy + e.clientY - d.sy });
+  }, []);
+
+  const onGripUp = useCallback(() => {
+    dragRef.current = null;
+  }, []);
 
   return (
-    <div className="flex flex-col gap-1 bg-neutral-900 py-2 px-1 items-center shrink-0">
-      {tools.map((t) => (
-        <button
-          key={t.id}
-          title={t.label}
-          onClick={() => setMode(t.id)}
-          className={[
-            "w-9 h-9 flex items-center justify-center rounded-md transition-colors",
-            mode === t.id
-              ? "bg-blue-600 text-white"
-              : "text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200",
-          ].join(" ")}
-        >
-          {t.icon}
+    <div
+      className="fixed z-50 rounded-xl bg-white/95 backdrop-blur-sm border border-gray-200 shadow-xl shadow-black/8 overflow-hidden select-none"
+      style={{ left: pos.x, top: pos.y }}
+    >
+      {/* Drag grip */}
+      <div
+        className="h-5 bg-gray-50 cursor-grab active:cursor-grabbing flex items-center justify-center border-b border-gray-100"
+        onPointerDown={onGripDown}
+        onPointerMove={onGripMove}
+        onPointerUp={onGripUp}
+      >
+        <svg viewBox="0 0 20 6" className="w-5 h-1.5 text-gray-300">
+          <circle cx="4" cy="1.5" r="1.2" fill="currentColor" />
+          <circle cx="10" cy="1.5" r="1.2" fill="currentColor" />
+          <circle cx="16" cy="1.5" r="1.2" fill="currentColor" />
+          <circle cx="4" cy="4.5" r="1.2" fill="currentColor" />
+          <circle cx="10" cy="4.5" r="1.2" fill="currentColor" />
+          <circle cx="16" cy="4.5" r="1.2" fill="currentColor" />
+        </svg>
+      </div>
+
+      {/* Row: vertical tool strip + hatch panel (when active) */}
+      <div className="flex items-stretch">
+        {/* Tool buttons + Undo / Redo / Zoom (vertical) */}
+        <div className="flex flex-col gap-0.5 p-1.5 items-center shrink-0">
+          {tools.map((t) => (
+            <button
+              key={t.id}
+              title={t.label}
+              onClick={() => setMode(t.id)}
+              className={[
+                "w-9 h-9 flex items-center justify-center rounded-lg transition-colors",
+                mode === t.id
+                  ? "bg-blue-500 text-white shadow-sm"
+                  : "text-gray-500 hover:bg-gray-100 hover:text-gray-700",
+              ].join(" ")}
+            >
+              {t.icon}
+            </button>
+          ))}
+          <div className="h-px w-6 bg-gray-200 my-0.5" aria-hidden />
+          <button
+            title="Undo (Ctrl/Cmd+Z)"
+            onClick={undo}
+            disabled={!canUndo}
+            className="w-9 h-9 flex items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent"
+          >
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 10h10a5 5 0 0 1 5 5v2" />
+              <path d="M3 10l4-4M3 10l4 4" />
+          </svg>
         </button>
-      ))}
+        <button
+          title="Redo (Ctrl+Shift+Z / Ctrl+Y)"
+          onClick={redo}
+          disabled={!canRedo}
+          className="w-9 h-9 flex items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent"
+        >
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 10H11a5 5 0 0 0-5 5v2" />
+            <path d="M21 10l-4-4M21 10l-4 4" />
+          </svg>
+        </button>
+        <button
+          title="Zoom to fit"
+          onClick={requestZoomExtents}
+          className="w-9 h-9 flex items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+        >
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+            <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+            <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+            <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Hatch options expand to the right when active */}
+      {mode === "hatch" && <HatchSidebar />}
+      </div>
     </div>
   );
 }
