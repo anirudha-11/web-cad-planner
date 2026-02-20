@@ -138,9 +138,9 @@ function deriveElevationScene(
 ): DraftScene {
   const inner = room.innerLoop;
   const n = inner.length;
-  const T = room.wallThickness;
   const H = room.wallHeight;
   const b = bounds(inner);
+  const strokeMm = room.wallConfig?.strokeWidthMm ?? 5;
 
   const isNS = view === "north" || view === "south";
   const L = isNS ? b.width : b.height;
@@ -149,26 +149,16 @@ function deriveElevationScene(
   const outline = "rgba(0,0,0,0.9)";
   const primitives: DraftScene["primitives"] = [];
 
-  // ── wall cross-section: outer boundary with inner-face hole ──
-  // Stroke-only; the hatch system provides the fill (default diagonal + white bg).
+  // ── elevation face only (no wall thickness); hatch system can still fill zones
   primitives.push({
     kind: "polygon" as const,
     outer: [
-      { x: -T, y: 0 },
-      { x: L + T, y: 0 },
-      { x: L + T, y: H },
-      { x: -T, y: H },
+      { x: 0, y: 0 },
+      { x: L, y: 0 },
+      { x: L, y: H },
+      { x: 0, y: H },
     ],
-    holes: [
-      [
-        { x: 0, y: 0 },
-        { x: L, y: 0 },
-        { x: L, y: H },
-        { x: 0, y: H },
-      ],
-    ],
-    strokeOuter: { color: outline, widthMm: 5 },
-    strokeHoles: { color: outline, widthMm: 5 },
+    strokeOuter: { color: outline, widthMm: strokeMm },
   });
 
   // ── tile band at floor level (bottom of elevation, y = H-tileH … H) ──
@@ -241,8 +231,8 @@ function deriveElevationScene(
   primitives.push({
     kind: "dimension" as const,
     segIndex: -1,
-    a: { x: L + T, y: H },
-    b: { x: L + T, y: 0 },
+    a: { x: L, y: H },
+    b: { x: L, y: 0 },
     offsetMm: dimOffset,
     side: "out" as const,
     stroke: dimStroke,

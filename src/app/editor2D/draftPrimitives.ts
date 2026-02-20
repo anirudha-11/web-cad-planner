@@ -58,6 +58,10 @@ export type hatchFill = {
   lineWidthMm: number;
   angleDeg: number;
   opacity: number;
+  tileLengthMm?: number;
+  tileWidthMm?: number;
+  /** Pair-line options for poche (e.g. arch-cut-wall): draw two lines per stripe */
+  pair?: { enabled: boolean; gapMm: number };
 };
 
 export type DraftPrimitive = line | polyline | text | polygon | dimension | hatchFill;

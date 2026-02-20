@@ -1,22 +1,32 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useTool } from "../state/ToolContext";
 import { HATCH_PATTERNS, type HatchPatternId, getPatternDef } from "../core/hatch/hatchPatterns";
+
+const TILE_PATTERN_IDS = ["rectangle", "brick", "herringbone"] as const;
+const TILE_PATTERNS = HATCH_PATTERNS.filter((p) => TILE_PATTERN_IDS.includes(p.id as (typeof TILE_PATTERN_IDS)[number]));
 
 export default function HatchSidebar() {
   const { hatchConfig, setHatchConfig, selectPattern } = useTool();
   const activeDef = getPatternDef(hatchConfig.patternId as HatchPatternId);
 
+  // When sidebar is for tile patterns only, ensure selection is one of them
+  useEffect(() => {
+    if (!TILE_PATTERN_IDS.includes(hatchConfig.patternId as (typeof TILE_PATTERN_IDS)[number])) {
+      selectPattern("rectangle");
+    }
+  }, [hatchConfig.patternId, selectPattern]);
+
   return (
     <div className="w-52 border-l border-gray-200 flex flex-col text-gray-700 max-h-[70vh] overflow-y-auto shrink-0">
-      {/* Pattern grid */}
+      {/* Pattern grid: only rectangle, brick, herringbone */}
       <div className="px-3 pt-3 pb-1">
         <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
           Patterns
         </h3>
         <div className="grid grid-cols-3 gap-1.5">
-          {HATCH_PATTERNS.map((p) => {
+          {TILE_PATTERNS.map((p) => {
             const active = hatchConfig.patternId === p.id;
             return (
               <button
@@ -43,23 +53,16 @@ export default function HatchSidebar() {
 
       {/* Active pattern label */}
       <div className="px-3 pt-1.5 pb-1">
-        <span className="text-[11px] text-gray-400">{activeDef?.name ?? "None"}</span>
+        <span className="text-[11px] text-gray-400">{activeDef?.name ?? "—"}</span>
       </div>
 
       <div className="h-px bg-gray-100 mx-3 my-1" />
 
-      {/* Customization */}
+      {/* Customization: tile length, tile width, background only (no color, line weight, opacity) */}
       <div className="px-3 py-2 flex flex-col gap-2.5 text-[11px]">
         <h3 className="font-semibold text-gray-400 uppercase tracking-wider text-[10px]">
           Customize
         </h3>
-
-        <Field label="Color">
-          <ColorInput
-            value={hatchConfig.color}
-            onChange={(color) => setHatchConfig((c) => ({ ...c, color }))}
-          />
-        </Field>
 
         <Field label="Background">
           <ColorInput
@@ -69,47 +72,28 @@ export default function HatchSidebar() {
           />
         </Field>
 
-        {hatchConfig.patternId !== "solid" && hatchConfig.patternId !== "none" && (
-          <>
-            <Field label={`Spacing (${Math.round(hatchConfig.spacingMm)} mm)`}>
-              <input
-                type="range"
-                min={20}
-                max={300}
-                step={5}
-                value={hatchConfig.spacingMm}
-                onChange={(e) =>
-                  setHatchConfig((c) => ({ ...c, spacingMm: Number(e.target.value) }))
-                }
-                className="w-full accent-blue-500"
-              />
-            </Field>
-
-            <Field label={`Line Weight (${hatchConfig.lineWidthMm.toFixed(1)} mm)`}>
-              <input
-                type="range"
-                min={0.5}
-                max={5}
-                step={0.25}
-                value={hatchConfig.lineWidthMm}
-                onChange={(e) =>
-                  setHatchConfig((c) => ({ ...c, lineWidthMm: Number(e.target.value) }))
-                }
-                className="w-full accent-blue-500"
-              />
-            </Field>
-          </>
-        )}
-
-        <Field label={`Opacity (${Math.round(hatchConfig.opacity * 100)}%)`}>
+        <Field label={`Tile length (${Math.round(hatchConfig.tileLengthMm ?? hatchConfig.spacingMm)} mm)`}>
           <input
             type="range"
-            min={0.05}
-            max={1}
-            step={0.05}
-            value={hatchConfig.opacity}
+            min={100}
+            max={1000}
+            step={10}
+            value={hatchConfig.tileLengthMm ?? hatchConfig.spacingMm}
             onChange={(e) =>
-              setHatchConfig((c) => ({ ...c, opacity: Number(e.target.value) }))
+              setHatchConfig((c) => ({ ...c, tileLengthMm: Number(e.target.value) }))
+            }
+            className="w-full accent-blue-500"
+          />
+        </Field>
+        <Field label={`Tile width (${Math.round(hatchConfig.tileWidthMm ?? (hatchConfig.patternId === "rectangle" ? hatchConfig.spacingMm : hatchConfig.spacingMm / 2))} mm)`}>
+          <input
+            type="range"
+            min={100}
+            max={1000}
+            step={10}
+            value={hatchConfig.tileWidthMm ?? (hatchConfig.patternId === "rectangle" ? hatchConfig.spacingMm : hatchConfig.spacingMm / 2)}
+            onChange={(e) =>
+              setHatchConfig((c) => ({ ...c, tileWidthMm: Number(e.target.value) }))
             }
             className="w-full accent-blue-500"
           />

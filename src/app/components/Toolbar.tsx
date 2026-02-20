@@ -18,7 +18,7 @@ const tools: { id: ToolMode; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: "hatch",
-    label: "Hatch / Fill",
+    label: "Tile /Hatch / Fill",
     icon: (
       <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
         <rect x="3" y="3" width="18" height="18" rx="2" />

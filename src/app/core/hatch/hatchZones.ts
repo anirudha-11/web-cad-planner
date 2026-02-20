@@ -13,13 +13,17 @@ export type HatchZone = {
 };
 
 const DEFAULT_WALL_HATCH: HatchAssignment = {
-  patternId: "diagonal-right",
-  color: "rgba(0,0,0,0.25)",
+  patternId: "arch-cut-wall",
+  color: "rgb(214, 214, 214)",
   bgColor: "#ffffff",
-  spacingMm: 40,
-  lineWidthMm: 0.8,
+  spacingMm: 60,        // distance between line PAIRS
+  lineWidthMm: 1,
   angleDeg: 45,
   opacity: 1,
+  pair: {
+    enabled: true,
+    gapMm: 15,           // close gap between the 2 lines
+  },
 };
 
 // ── Zone geometry for each view ──
@@ -43,17 +47,12 @@ function getElevationZones(view: Exclude<ViewKind, "plan">, room: RoomModel): Ha
   const inner = room.innerLoop;
   const n = inner.length;
   const b = bounds(inner);
-  const T = room.wallThickness;
   const H = room.wallHeight;
   const isNS = view === "north" || view === "south";
   const L = isNS ? b.width : b.height;
   const originH = isNS ? b.minX : b.minY;
 
   const zones: HatchZone[] = [];
-
-  // Wall thickness sections (always present)
-  zones.push({ id: `${view}:wall-left`, label: "Left Section", outer: rect(-T, 0, 0, H), isWall: true });
-  zones.push({ id: `${view}:wall-right`, label: "Right Section", outer: rect(L, 0, L + T, H), isWall: true });
 
   // Compute return positions to split the face into per-section zones
   const returns = findElevationReturns(inner, view, originH, L);
@@ -147,12 +146,13 @@ export function buildHatchPrimitives(
 
     if (isPreview) {
       config = previewConfig ?? undefined;
+    } else if (zone.isWall) {
+      // Wall always uses default; user cannot override
+      config = room.wallConfig?.defaultWallHatch ?? DEFAULT_WALL_HATCH;
     } else if (zone.id in hatches) {
       // Explicit user assignment (may be "none" to suppress default)
       const a = hatches[zone.id];
       config = a.patternId !== "none" ? a : undefined;
-    } else if (zone.isWall) {
-      config = DEFAULT_WALL_HATCH;
     }
 
     if (!config) continue;
@@ -169,6 +169,9 @@ export function buildHatchPrimitives(
       lineWidthMm: config.lineWidthMm,
       angleDeg: config.angleDeg,
       opacity: isPreview ? Math.min(config.opacity, 0.5) : config.opacity,
+      ...(config.tileLengthMm != null && { tileLengthMm: config.tileLengthMm }),
+      ...(config.tileWidthMm != null && { tileWidthMm: config.tileWidthMm }),
+      ...(config.pair != null && { pair: config.pair }),
     });
   }
 

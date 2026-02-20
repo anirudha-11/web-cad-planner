@@ -116,6 +116,8 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
         lineWidthMm: hatchConfig.lineWidthMm,
         angleDeg: hatchConfig.angleDeg,
         opacity: hatchConfig.opacity,
+        ...(hatchConfig.tileLengthMm != null && { tileLengthMm: hatchConfig.tileLengthMm }),
+        ...(hatchConfig.tileWidthMm != null && { tileWidthMm: hatchConfig.tileWidthMm }),
       };
       const before = room;
       const prevHatches = { ...(room.hatches ?? {}) };
@@ -143,8 +145,10 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
       const sy = e.clientY - rect.top;
       const world = viewport.screenToWorld({ x: sx, y: sy });
       const hit = hitTestZone(world, zones);
-      setLocalHoverZone(hit ? hit.id : null);
-      canvas.style.cursor = hit ? "crosshair" : "default";
+      const zone = hit ? zones.find((z) => z.id === hit.id) : null;
+      const canApply = hit && zone && !zone.isWall;
+      setLocalHoverZone(canApply ? hit.id : null);
+      canvas.style.cursor = canApply ? "crosshair" : "default";
     };
 
     const onClick = (e: PointerEvent) => {
@@ -154,7 +158,11 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
       const sy = e.clientY - rect.top;
       const world = viewport.screenToWorld({ x: sx, y: sy });
       const hit = hitTestZone(world, zones);
-      if (hit) applyHatch(hit.id);
+      if (hit) {
+        const zone = zones.find((z) => z.id === hit.id);
+        if (zone?.isWall) return; // Wall hatch is fixed by default; don't allow override
+        applyHatch(hit.id);
+      }
     };
 
     canvas.addEventListener("pointermove", onMove);

@@ -10,6 +10,18 @@ export type HatchAssignment = {
   lineWidthMm: number;
   angleDeg: number;
   opacity: number;
+  tileLengthMm?: number;
+  tileWidthMm?: number;
+  /** Pair-line options; used by arch-cut-wall and similar patterns */
+  pair?: { enabled: boolean; gapMm: number };
+};
+
+/** Wall display defaults: outline stroke weight and default hatch for wall zones */
+export type WallConfig = {
+  /** Stroke width (mm) for wall outline in plan and elevation */
+  strokeWidthMm?: number;
+  /** Default hatch applied to wall zones when no zone-specific hatch is set */
+  defaultWallHatch?: HatchAssignment;
 };
 
 export type RoomModel = {
@@ -27,14 +39,16 @@ export type RoomModel = {
   entities: EntityMap;
 
   hatches?: Record<string, HatchAssignment>;
+  /** Wall outline and default wall hatch; when absent, app defaults are used */
+  wallConfig?: WallConfig;
 };
 
 
 export const createDefaultRoom = (): RoomModel => {
   const x0 = 0;
   const y0 = 0;
-  const width = 2560;
-  const depth = 2070;
+  const width = 2500;
+  const depth = 4000;
 
   return {
     id: "room-1",
