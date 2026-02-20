@@ -77,7 +77,7 @@ function deriveElevationScene(view: Exclude<ViewKind, "plan">, room: RoomModel):
   const L = isNS ? b.width : b.height;
   const originH = isNS ? b.minX : b.minY;
 
-  const outline = "rgba(0,0,0,0.9)";
+  const outline = "rgb(0, 0, 0)";
   const primitives: DraftScene["primitives"] = [];
 
   primitives.push({

@@ -10,6 +10,7 @@ const DOOR_STROKE = { color: "rgb(0, 0, 0)", widthMm: 5 };
 const DOOR_FILL = { color: "rgb(255, 255, 255)" };
 const DOOR_STROKE_RECT = { color: "rgb(255, 255, 255)", widthMm: 5 };
 const ARC_SEGMENTS = 32;
+const DOOR_STROKE_ELE = { color: "rgb(0, 0, 0)", widthMm: 1 };
 
 function arcPoints(center: Vec2, radius: number, startAngle: number, endAngle: number): Vec2[] {
   const pts: Vec2[] = [];
@@ -166,7 +167,15 @@ export function buildDoorElevPrimitives(
     { x: r.x0, y: r.y1 },
   ];
 
-  prims.push({ kind: "polygon" as const, outer, fill: DOOR_FILL, strokeOuter: DOOR_STROKE });
+  prims.push({ kind: "polygon" as const, outer, fill: DOOR_FILL, strokeOuter: DOOR_STROKE_ELE });
+  const T = 30;
+  const inner: Vec2[] = [
+    { x: r.x0 + T, y: r.y0 + T },
+    { x: r.x1 - T, y: r.y0 + T },
+    { x: r.x1 - T, y: r.y1  },
+    { x: r.x0 + T, y: r.y1  },
+  ];
+  prims.push({ kind: "polygon" as const, outer: inner, fill: DOOR_FILL, strokeOuter: DOOR_STROKE_ELE });
 
   const style = entity.doorStyle ?? "single-leaf";
   const midX = (r.x0 + r.x1) / 2;

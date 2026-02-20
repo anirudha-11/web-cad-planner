@@ -9,6 +9,7 @@ import { getWindowPlanRect, getWindowElevationRect } from "../entities/windowGeo
 const WIN_STROKE = { color: "rgb(0, 0, 0)", widthMm: 5 };
 const WIN_FILL = { color: "rgb(255, 255, 255)" };
 const WIN_STROKE_RECT = { color: "rgb(255, 255, 255)", widthMm: 1 };
+const WIN_STROKE_ELE = { color: "rgb(0, 0, 0)", widthMm: 1 };
 
 export function buildWindowPlanPrimitives(room: RoomModel, entity: WallOpeningEntity): DraftPrimitive[] {
   const prims: DraftPrimitive[] = [];
@@ -128,8 +129,16 @@ export function buildWindowElevPrimitives(
     { x: r.x0, y: r.y1 },
   ];
 
-  prims.push({ kind: "polygon" as const, outer, fill: WIN_FILL, strokeOuter: WIN_STROKE });
+  prims.push({ kind: "polygon" as const, outer, fill: WIN_FILL, strokeOuter: WIN_STROKE_ELE });
 
+  const T = 30;
+  const inner: Vec2[] = [
+    { x: r.x0 + T, y: r.y0 + T },
+    { x: r.x1 - T, y: r.y0 + T },
+    { x: r.x1 - T, y: r.y1 - T },
+    { x: r.x0 + T, y: r.y1 - T },
+  ];
+  prims.push({ kind: "polygon" as const, outer: inner, fill: WIN_FILL, strokeOuter: WIN_STROKE_ELE });
   const style = entity.windowStyle ?? "single-leaf";
   const midX = (r.x0 + r.x1) / 2;
 
