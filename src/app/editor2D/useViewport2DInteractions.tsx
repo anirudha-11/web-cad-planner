@@ -3,7 +3,7 @@ import type { Viewport2D } from "./Viewport2D";
 import type { ViewKind } from "../core/view/ViewKind";
 import type { RoomModel, Vec2 } from "../model/RoomModel";
 import { hitTestInnerLoopSegment, getInnerLoopSegment } from "./hitTestRoomEdges";
-import { clearDimOverridesForMovedVertices, insertVertexOnSegment, moveWallLine, segLineCoord } from "../core/geometry/orthoLoopEdit";
+import { clearDimOverridesForMovedVertices, insertVertexOnSegment, moveWallLine, segLineCoord, offsetSegmentWithReturns_Ortho } from "../core/geometry/orthoLoopEdit";
 
 type UseViewport2DInteractionsArgs = {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -158,31 +158,14 @@ export function useViewport2DInteractions({
           movedLoop = res.loop;
           movedVertexIdxs = res.movedVertexIdxs;
         } else {
-          // Line has multiple collinear vertices (e.g. after splitting with Shift+click).
-          // Keep the "near" endpoint (a) fixed, insert a new corner vertex below/right of it,
-          // and move the far endpoint (b) to that new level → orthogonal return and L-shape.
-          movedLoop = startLoop.map((p) => ({ ...p })) as Vec2[];
-
-          if (isHorizontal) {
-            const newY = a.y + dyW;
-            const insertIdx = aIdx + 1;
-            // Insert corner directly below/above a
-            movedLoop.splice(insertIdx, 0, { x: a.x, y: newY });
-            // After splice, b shifts by +1
-            const newBIdx = bIdx + 1;
-            movedLoop[newBIdx] = { x: movedLoop[newBIdx].x, y: newY };
-            movedVertexIdxs = [insertIdx, newBIdx];
-          } else {
-            const newX = a.x + dxW;
-            const insertIdx = aIdx + 1;
-            // Insert corner directly left/right of a
-            movedLoop.splice(insertIdx, 0, { x: newX, y: a.y });
-            const newBIdx = bIdx + 1;
-            movedLoop[newBIdx] = { x: newX, y: movedLoop[newBIdx].y };
-            movedVertexIdxs = [insertIdx, newBIdx];
-          }
+          // Robust notch behavior:
+          // offset ONLY this segment by delta, insert A' and B' to form returns on both ends.
+          const delta = isHorizontal ? dyW : dxW;
+          const res = offsetSegmentWithReturns_Ortho(startLoop, segIndex, delta);
+          movedLoop = res.loop;
+          movedVertexIdxs = res.movedVertexIdxs;
         }
-
+        
         const next = clearDimOverridesForMovedVertices({ ...startRoom, innerLoop: movedLoop }, movedVertexIdxs);
         previewRoom(() => next);
 

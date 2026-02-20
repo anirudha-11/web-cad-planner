@@ -2,10 +2,99 @@ import type { RoomModel, Vec2 } from "../../model/RoomModel";
 
 type Axis = "x" | "y";
 
-const EPS = 1e-6;
+const EPS = 1e-3;
 
 function nearlyEqual(a: number, b: number, eps = EPS) {
   return Math.abs(a - b) <= eps;
+}
+
+function segIsHorizontal(loop: Vec2[], segIndex: number) {
+  const n = loop.length;
+  const a = loop[segIndex];
+  const b = loop[(segIndex + 1) % n];
+  return Math.abs(a.y - b.y) <= Math.abs(a.x - b.x);
+}
+
+function vertexIsCorner(loop: Vec2[], vIdx: number) {
+  const n = loop.length;
+  if (n < 3) return false;
+
+  const prevSegIdx = (vIdx - 1 + n) % n; // segment (vIdx-1 -> vIdx)
+  const nextSegIdx = vIdx;              // segment (vIdx -> vIdx+1)
+
+  const prevIsH = segIsHorizontal(loop, prevSegIdx);
+  const nextIsH = segIsHorizontal(loop, nextSegIdx);
+
+  // Corner if adjacent segments differ in orientation
+  return prevIsH !== nextIsH;
+}
+
+/**
+ * Offset ONLY the selected segment by `delta` perpendicular to itself.
+ * Inserts TWO returns by default (A' and B'), BUT:
+ * - If an endpoint is a corner (shared by H+V), move that endpoint instead of inserting a return there.
+ *
+ * This yields:
+ * - middle segment B-C: A-B-B'-C'-C-D
+ * - end segment A-B where A is corner: A(moved)-B'-B-C-D
+ */
+export function offsetSegmentWithReturns_Ortho(loop: Vec2[], segIndex: number, delta: number) {
+  const n = loop.length;
+  if (n < 2) return { loop, movedVertexIdxs: [] as number[] };
+
+  const aIdx = segIndex;
+  const bIdx = (segIndex + 1) % n;
+
+  const a = loop[aIdx];
+  const b = loop[bIdx];
+
+  const isH = segIsHorizontal(loop, segIndex);
+
+  const aOff: Vec2 = isH ? { x: a.x, y: a.y + delta } : { x: a.x + delta, y: a.y };
+  const bOff: Vec2 = isH ? { x: b.x, y: b.y + delta } : { x: b.x + delta, y: b.y };
+
+  const aIsCorner = vertexIsCorner(loop, aIdx);
+  const bIsCorner = vertexIsCorner(loop, bIdx);
+
+  const out: Vec2[] = [];
+  const movedNewIdxs: number[] = []; // indices in the NEW loop (inserted or moved corner)
+
+  // Rebuild loop in one pass (wrap-around safe)
+  for (let i = 0; i < n; i++) {
+    const v = loop[i];
+
+    if (i === aIdx) {
+      if (aIsCorner) {
+        // Move the corner itself (no extra return point)
+        movedNewIdxs.push(out.length);
+        out.push({ ...aOff });
+      } else {
+        // Keep A, then insert A'
+        out.push({ ...v });
+        movedNewIdxs.push(out.length);
+        out.push({ ...aOff });
+      }
+      continue;
+    }
+
+    if (i === bIdx) {
+      if (bIsCorner) {
+        // Move the corner itself (no extra return point)
+        movedNewIdxs.push(out.length);
+        out.push({ ...bOff });
+      } else {
+        // Insert B', then keep B
+        movedNewIdxs.push(out.length);
+        out.push({ ...bOff });
+        out.push({ ...v });
+      }
+      continue;
+    }
+
+    out.push({ ...v });
+  }
+
+  return { loop: out, movedVertexIdxs: movedNewIdxs };
 }
 
 function segDir(loop: Vec2[], segIndex: number): "h" | "v" {

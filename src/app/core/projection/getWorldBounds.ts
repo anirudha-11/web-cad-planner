@@ -17,15 +17,16 @@ export function getWorldBounds(view: ViewKind, room: RoomModel): Bounds2D {
   }
 
   const b = bounds(room.innerLoop);
+  const T = room.wallThickness;
   const L = view === "north" || view === "south" ? b.width : b.height;
   const H = room.wallHeight;
 
-  const marginX = 200;
-  const marginY = 200;
+  const marginX = 500;
+  const marginY = 500;
 
   return {
-    min: { x: -marginX, y: -marginY },
-    max: { x: L + marginX, y: H + marginY },
+    min: { x: -T - marginX, y: -marginY },
+    max: { x: L + T + marginX, y: H + marginY },
   };
 }
 
