@@ -1,9 +1,12 @@
-import type { DraftScene } from "../../editor2D/draftPrimitives";
+// src/editor2D/deriveDraftScene.ts
+import type { DraftPrimitive, DraftScene } from "../../editor2D/draftPrimitives";
 import type { RoomModel } from "../../model/RoomModel";
 import type { ViewKind } from "../view/ViewKind";
 import { offsetOrthoLoop } from "../../editor2D/offsetOrthoLoop";
 import type { Vec2 } from "../../editor2D/draftPrimitives";
 import { DIMENSION_DEFAULTS } from "../../editor2D/dimensionDefaults";
+import type { WallOpeningEntity } from "../entities/entityTypes";
+import { getWindowPlanRect, getWindowElevationRect } from "../entities/windowGeometry";
 
 export function deriveDraftScene(view: ViewKind, room: RoomModel): DraftScene {
   if (view === "plan") return derivePlanScene(room);
@@ -51,6 +54,11 @@ function derivePlanScene(room: RoomModel): DraftScene {
     });
   }
 
+  for (const entity of Object.values(room.entities)) {
+    if (entity.kind !== "wall-opening" || entity.openingType !== "window") continue;
+    primitives.push(...buildWindowPlanPrimitives(room, entity));
+  }
+
   return { primitives };
 }
 
@@ -89,10 +97,14 @@ export function edgeFacesDirection(
   const isH = Math.abs(dx) > Math.abs(dy);
 
   switch (dir) {
-    case "north": return isH && dx > 0;
-    case "south": return isH && dx < 0;
-    case "east":  return !isH && dy > 0;
-    case "west":  return !isH && dy < 0;
+    case "north":
+      return isH && dx > 0;
+    case "south":
+      return isH && dx < 0;
+    case "east":
+      return !isH && dy > 0;
+    case "west":
+      return !isH && dy < 0;
   }
 }
 
@@ -122,8 +134,7 @@ export function findElevationReturns(
 
     const prevIdx = (i - 1 + n) % n;
     const nextIdx = (i + 1) % n;
-    if (!edgeFacesDirection(loop, prevIdx, view) && !edgeFacesDirection(loop, nextIdx, view))
-      continue;
+    if (!edgeFacesDirection(loop, prevIdx, view) && !edgeFacesDirection(loop, nextIdx, view)) continue;
 
     const pos = isNS ? a.x - originH : a.y - originH;
     if (pos > 0.5 && pos < totalL - 0.5) seen.add(Math.round(pos * 10) / 10);
@@ -132,10 +143,7 @@ export function findElevationReturns(
   return Array.from(seen).sort((a, b) => a - b);
 }
 
-function deriveElevationScene(
-  view: Exclude<ViewKind, "plan">,
-  room: RoomModel,
-): DraftScene {
+function deriveElevationScene(view: Exclude<ViewKind, "plan">, room: RoomModel): DraftScene {
   const inner = room.innerLoop;
   const n = inner.length;
   const H = room.wallHeight;
@@ -160,21 +168,6 @@ function deriveElevationScene(
     ],
     strokeOuter: { color: outline, widthMm: strokeMm },
   });
-
-  // ── tile band at floor level (bottom of elevation, y = H-tileH … H) ──
-  // const tileH = Math.min(1200, H);
-  // primitives.push({
-  //   kind: "polyline" as const,
-  //   pts: [
-  //     { x: 0, y: H - tileH },
-  //     { x: L, y: H - tileH },
-  //     { x: L, y: H },
-  //     { x: 0, y: H },
-  //   ],
-  //   closed: true,
-  //   fill: { color: "rgba(0, 0, 0, 0.08)" },
-  //   stroke: { color: "rgba(0, 0, 0, 0.18)", widthMm: 0.13 },
-  // });
 
   // ── return-wall vertical lines for non-rectangular rooms ──
   const returns = findElevationReturns(inner, view, originH, L);
@@ -227,6 +220,11 @@ function deriveElevationScene(
     });
   }
 
+  for (const entity of Object.values(room.entities)) {
+    if (entity.kind !== "wall-opening" || entity.openingType !== "window") continue;
+    primitives.push(...buildWindowElevPrimitives(room, entity, view));
+  }
+
   // ── wall-height dimension (right side) ──
   primitives.push({
     kind: "dimension" as const,
@@ -244,3 +242,188 @@ function deriveElevationScene(
   return { primitives };
 }
 
+// ── Window rendering helpers ──
+
+const WIN_STROKE = { color: "rgb(0, 0, 0)", widthMm: 5 };
+const WIN_FILL = { color: "rgb(255, 255, 255)" };
+const WIN_STROKE_RECT = { color: "rgb(255, 255, 255)", widthMm: 1 };
+
+// --- small vector helpers ---
+const dot = (a: Vec2, b: Vec2) => a.x * b.x + a.y * b.y;
+const perp = (v: Vec2): Vec2 => ({ x: -v.y, y: v.x });
+
+function buildWindowPlanPrimitives(room: RoomModel, entity: WallOpeningEntity): DraftPrimitive[] {
+  const prims: DraftPrimitive[] = [];
+  const rect = getWindowPlanRect(room, entity);
+
+  // Robust corner classification so "jamb" lines are ALWAYS perpendicular to wall
+  const corners = rect.corners as Vec2[];
+  const n = rect.normal as Vec2; // wall normal (perp to wall)
+  const t = perp(n); // wall tangent (along wall)
+
+  // Project corners into local (s,u) frame:
+  //  s = along wall (t), u = across thickness (n)
+  const proj = corners.map((p) => ({ p, s: dot(p, t), u: dot(p, n) }));
+  const sMin = Math.min(...proj.map((q) => q.s));
+  const sMax = Math.max(...proj.map((q) => q.s));
+  const uMin = Math.min(...proj.map((q) => q.u));
+  const uMax = Math.max(...proj.map((q) => q.u));
+
+  const epsS = Math.max(1e-6, (sMax - sMin) * 1e-6);
+
+  const pickEdgeAtS = (targetS: number) => {
+    let pts = proj.filter((q) => Math.abs(q.s - targetS) <= epsS).map((q) => q.p);
+    // Fallback for numeric jitter / unexpected ordering
+    if (pts.length !== 2) {
+      pts = proj
+        .slice()
+        .sort((a, b) => Math.abs(a.s - targetS) - Math.abs(b.s - targetS))
+        .slice(0, 2)
+        .map((q) => q.p);
+    }
+    // Order by u for stability
+    pts.sort((a, b) => dot(a, n) - dot(b, n));
+    return pts as [Vec2, Vec2];
+  };
+
+  const pickCornerNear = (sT: number, uT: number): Vec2 => {
+    let best = proj[0];
+    let bestD = Infinity;
+    for (const q of proj) {
+      const ds = q.s - sT;
+      const du = q.u - uT;
+      const d = ds * ds + du * du;
+      if (d < bestD) {
+        bestD = d;
+        best = q;
+      }
+    }
+    return best.p;
+  };
+
+  // Rebuild stable corners in local frame:
+  // c0=(sMin,uMin), c1=(sMax,uMin), c2=(sMax,uMax), c3=(sMin,uMax)
+  const c0 = pickCornerNear(sMin, uMin);
+  const c1 = pickCornerNear(sMax, uMin);
+  const c2 = pickCornerNear(sMax, uMax);
+  const c3 = pickCornerNear(sMin, uMax);
+
+  prims.push({
+    kind: "polygon" as const,
+    outer: [c0, c1, c2, c3],
+    fill: WIN_FILL,
+    strokeOuter: WIN_STROKE_RECT,
+  });
+
+  // These two lines are now GUARANTEED to be the perpendicular jamb lines (short edges)
+  const [j0a, j0b] = pickEdgeAtS(sMin);
+  const [j1a, j1b] = pickEdgeAtS(sMax);
+
+  prims.push(
+    { kind: "line" as const, a: j0a, b: j0b, stroke: WIN_STROKE },
+    { kind: "line" as const, a: j1a, b: j1b, stroke: WIN_STROKE },
+  );
+
+  const style = entity.windowStyle ?? "single-leaf";
+  const T = room.wallThickness;
+
+  const mid0 = { x: (c0.x + c1.x) / 2, y: (c0.y + c1.y) / 2 };
+  const mid2 = { x: (c3.x + c2.x) / 2, y: (c3.y + c2.y) / 2 };
+
+  if (style === "double-leaf") {
+    prims.push({
+      kind: "line" as const,
+      a: mid0,
+      b: mid2,
+      stroke: WIN_STROKE,
+    });
+  } else if (style === "fixed") {
+    prims.push(
+      { kind: "line" as const, a: c0, b: c2, stroke: { ...WIN_STROKE, widthMm: 1 } },
+      { kind: "line" as const, a: c1, b: c3, stroke: { ...WIN_STROKE, widthMm: 1 } },
+    );
+  } else if (style === "sliding") {
+    prims.push({
+      kind: "line" as const,
+      a: mid0,
+      b: mid2,
+      stroke: { color: "rgba(0,0,0,0.5)", widthMm: 1, dashMm: [20, 20] },
+    });
+  }
+
+  // Glass lines parallel to wall (two lines inside the rectangle)
+  const glassOffset1 = T * 0.4;
+  const glassOffset2 = T * 0.6;
+  for (const off of [glassOffset1, glassOffset2]) {
+    const p0 = { x: c0.x + n.x * off, y: c0.y + n.y * off };
+    const p1 = { x: c1.x + n.x * off, y: c1.y + n.y * off };
+    prims.push({
+      kind: "line" as const,
+      a: p0,
+      b: p1,
+      stroke: { color: "rgb(0, 0, 0)", widthMm: 3 },
+    });
+  }
+
+  return prims;
+}
+
+function buildWindowElevPrimitives(
+  room: RoomModel,
+  entity: WallOpeningEntity,
+  view: Exclude<ViewKind, "plan">,
+): DraftPrimitive[] {
+  const r = getWindowElevationRect(room, entity, view);
+  if (!r) return [];
+
+  const prims: DraftPrimitive[] = [];
+  const outer: Vec2[] = [
+    { x: r.x0, y: r.y0 },
+    { x: r.x1, y: r.y0 },
+    { x: r.x1, y: r.y1 },
+    { x: r.x0, y: r.y1 },
+  ];
+
+  prims.push({
+    kind: "polygon" as const,
+    outer,
+    fill: WIN_FILL,
+    strokeOuter: WIN_STROKE,
+  });
+
+  const style = entity.windowStyle ?? "single-leaf";
+  const midX = (r.x0 + r.x1) / 2;
+
+  if (style === "double-leaf") {
+    prims.push({
+      kind: "line" as const,
+      a: { x: midX, y: r.y0 },
+      b: { x: midX, y: r.y1 },
+      stroke: WIN_STROKE,
+    });
+  } else if (style === "fixed") {
+    prims.push(
+      {
+        kind: "line" as const,
+        a: { x: r.x0, y: r.y0 },
+        b: { x: r.x1, y: r.y1 },
+        stroke: { ...WIN_STROKE, widthMm: 1 },
+      },
+      {
+        kind: "line" as const,
+        a: { x: r.x1, y: r.y0 },
+        b: { x: r.x0, y: r.y1 },
+        stroke: { ...WIN_STROKE, widthMm: 1 },
+      },
+    );
+  } else if (style === "sliding") {
+    prims.push({
+      kind: "line" as const,
+      a: { x: midX, y: r.y0 },
+      b: { x: midX, y: r.y1 },
+      stroke: { color: "rgba(0,0,0,0.5)", widthMm: 1, dashMm: [20, 20] },
+    });
+  }
+
+  return prims;
+}

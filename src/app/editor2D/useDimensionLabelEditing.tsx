@@ -22,6 +22,7 @@ type UseDimensionLabelEditingArgs = {
   viewport: Viewport2D;
   scenePrimitives: DraftPrimitive[];
   execute: (cmd: Command) => void;
+  onDimEditOpen?: () => void;
 };
 
 export function useDimensionLabelEditing({
@@ -31,6 +32,7 @@ export function useDimensionLabelEditing({
   viewport,
   scenePrimitives,
   execute,
+  onDimEditOpen,
 }: UseDimensionLabelEditingArgs) {
   const [dimEdit, setDimEdit] = useState<DimEditState | null>(null);
 
@@ -39,7 +41,10 @@ export function useDimensionLabelEditing({
       const labelWorld = dimLabelWorldPos(d);
       const labelScreen = viewport.worldToScreen(labelWorld);
 
-      const currentText = room.dimText?.[d.segIndex] ?? d.text ?? "";
+      // For window dimension sentinels (negative segIndex), use the dimension's own text
+      const currentText = d.segIndex < 0
+        ? (d.text ?? "")
+        : (room.dimText?.[d.segIndex] ?? d.text ?? "");
 
       setDimEdit({
         segIndex: d.segIndex,
@@ -55,8 +60,6 @@ export function useDimensionLabelEditing({
     if (!canvas) return;
 
     const onDblClick = (e: MouseEvent) => {
-      if (view !== "plan") return;
-
       const rect = canvas.getBoundingClientRect();
       const click: ScreenPt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 
@@ -77,12 +80,15 @@ export function useDimensionLabelEditing({
         if (d2 <= hitR2 && (!best || d2 < best.d2)) best = { d, d2 };
       }
 
-      if (best) openDimEditorFromDim(best.d);
+      if (best) {
+        onDimEditOpen?.();
+        openDimEditorFromDim(best.d);
+      }
     };
 
     canvas.addEventListener("dblclick", onDblClick);
     return () => canvas.removeEventListener("dblclick", onDblClick);
-  }, [canvasRef, view, scenePrimitives, viewport, openDimEditorFromDim]);
+  }, [canvasRef, view, scenePrimitives, viewport, openDimEditorFromDim, onDimEditOpen]);
 
   const commitDimEdit = useCallback(
     (segIndex: number, raw: string) => {

@@ -14,6 +14,8 @@ export type EntityBase = {
   kind: string;
 };
 
+export type WindowStyle = "single-leaf" | "double-leaf" | "fixed" | "sliding";
+
 export type WallOpeningEntity = EntityBase & {
   kind: "wall-opening";
   attach: WallAttachment;
@@ -21,6 +23,7 @@ export type WallOpeningEntity = EntityBase & {
   widthMm: number;
   heightMm: number;
   sillHeightMm?: number;
+  windowStyle?: WindowStyle;
 };
 
 export type FixtureEntity = EntityBase & {

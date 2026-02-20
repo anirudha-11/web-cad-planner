@@ -1,5 +1,6 @@
 import type { RoomModel } from "../../model/RoomModel";
 import type { Command } from "./Command";
+import type { Entity, EntityId } from "../entities/entityTypes";
 import { applySegmentLength_Ortho, clearDimOverridesForMovedVertices, moveWallLine } from "../geometry/orthoLoopEdit";
 
 export function createMoveWallLineCommand(args: {
@@ -68,5 +69,27 @@ export function createCommitDimEditCommand(args: { before: RoomModel; segIndex: 
     do: () => after,
     undo: () => args.before,
   };
+}
+
+export function createAddEntityCommand(before: RoomModel, entity: Entity): Command {
+  const after: RoomModel = {
+    ...before,
+    entities: { ...before.entities, [entity.id]: entity },
+  };
+  return { name: "add-entity", do: () => after, undo: () => before };
+}
+
+export function createUpdateEntityCommand(before: RoomModel, entity: Entity): Command {
+  const after: RoomModel = {
+    ...before,
+    entities: { ...before.entities, [entity.id]: entity },
+  };
+  return { name: "update-entity", do: () => after, undo: () => before };
+}
+
+export function createRemoveEntityCommand(before: RoomModel, entityId: EntityId): Command {
+  const { [entityId]: _, ...rest } = before.entities;
+  const after: RoomModel = { ...before, entities: rest };
+  return { name: "remove-entity", do: () => after, undo: () => before };
 }
 

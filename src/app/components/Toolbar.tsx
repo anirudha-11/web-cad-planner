@@ -4,6 +4,7 @@ import React, { useCallback, useRef, useState } from "react";
 import { useTool, type ToolMode } from "../state/ToolContext";
 import { useRoomHistory } from "../state/RoomHistoryContext";
 import HatchSidebar from "./HatchSidebar";
+import WindowToolPanel from "./WindowToolPanel";
 
 const tools: { id: ToolMode; label: string; icon: React.ReactNode }[] = [
   {
@@ -31,6 +32,17 @@ const tools: { id: ToolMode; label: string; icon: React.ReactNode }[] = [
         <line x1="21" y1="12" x2="12" y2="21" />
         <line x1="21" y1="16" x2="16" y2="21" />
         <line x1="21" y1="20" x2="20" y2="21" />
+      </svg>
+    ),
+  },
+  {
+    id: "window",
+    label: "Window",
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="1" />
+        <line x1="12" y1="3" x2="12" y2="21" />
+        <line x1="3" y1="12" x2="21" y2="12" />
       </svg>
     ),
   },
@@ -139,8 +151,9 @@ export default function Toolbar() {
         </button>
       </div>
 
-      {/* Hatch options expand to the right when active */}
+      {/* Tool panels expand to the right when active */}
       {mode === "hatch" && <HatchSidebar />}
+      {mode === "window" && <WindowToolPanel />}
       </div>
     </div>
   );

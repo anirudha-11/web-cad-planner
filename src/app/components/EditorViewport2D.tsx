@@ -14,6 +14,9 @@ import type { ViewKind } from "../core/view/ViewKind";
 import type { HatchAssignment } from "../model/RoomModel";
 import { useViewport2DInteractions } from "../editor2D/useViewport2DInteractions";
 import { useDimensionLabelEditing } from "../editor2D/useDimensionLabelEditing";
+import { useWindowInteractions, WIN_DIM_LEFT_SEG, WIN_DIM_RIGHT_SEG, WIN_DIM_ELEV_SILL_SEG, WIN_DIM_ELEV_HEIGHT_SEG } from "../editor2D/useWindowInteractions";
+import { repositionWindowByDim } from "../core/entities/windowGeometry";
+import type { WallOpeningEntity } from "../core/entities/entityTypes";
 
 export type { ViewKind };
 
@@ -23,13 +26,29 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
   const [version, setVersion] = useState(0);
 
   const { room, execute, previewRoom, commitSnapshot, undo, redo, canUndo, canRedo } = useRoomHistory();
-  const { mode: toolMode, hatchConfig, hoverZoneId, setHoverZoneId, zoomExtentsTrigger } = useTool();
+  const { mode: toolMode, setMode, hatchConfig, hoverZoneId, setHoverZoneId, zoomExtentsTrigger, windowConfig, selectedEntityId, setSelectedEntityId } = useTool();
 
   const [hoverSeg, setHoverSeg] = useState<number | null>(null);
   const [selectedSeg, setSelectedSeg] = useState<number | null>(null);
 
   // Local hover zone ID scoped to this viewport
   const [localHoverZone, setLocalHoverZone] = useState<string | null>(null);
+
+  // ── Window tool interactions ──
+  const { previewPrimitives: windowPreviewPrims, cancelPendingDeselect } = useWindowInteractions({
+    canvasRef,
+    viewport,
+    view,
+    room,
+    commitSnapshot,
+    previewRoom,
+    toolMode,
+    windowConfig,
+    selectedEntityId,
+    setSelectedEntityId,
+    setMode,
+    onViewportChange: () => setVersion((v) => v + 1),
+  });
 
   const activePreviewZone = toolMode === "hatch" ? localHoverZone : null;
   const activePreviewConfig: HatchAssignment | null =
@@ -78,18 +97,58 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
       }
     }
 
-    return { primitives: [...hatchPrims, ...base.primitives, ...overlays] };
-  }, [view, room, hoverSeg, selectedSeg, toolMode, activePreviewZone, activePreviewConfig]);
+    return { primitives: [...hatchPrims, ...base.primitives, ...overlays, ...windowPreviewPrims] };
+  }, [view, room, hoverSeg, selectedSeg, toolMode, activePreviewZone, activePreviewConfig, windowPreviewPrims]);
 
-  // Dimension label double-click + inline editor (plan view)
-  const { dimEdit, setDimEdit, commitDimEdit } = useDimensionLabelEditing({
+  // Dimension label double-click + inline editor
+  const { dimEdit, setDimEdit, commitDimEdit: commitWallDimEdit } = useDimensionLabelEditing({
     canvasRef,
     view,
     room,
     viewport,
     scenePrimitives: scene.primitives,
     execute,
+    onDimEditOpen: cancelPendingDeselect,
   });
+
+  const commitDimEdit = useCallback(
+    (segIndex: number, raw: string) => {
+      const isWindowDim =
+        segIndex === WIN_DIM_LEFT_SEG ||
+        segIndex === WIN_DIM_RIGHT_SEG ||
+        segIndex === WIN_DIM_ELEV_SILL_SEG ||
+        segIndex === WIN_DIM_ELEV_HEIGHT_SEG;
+
+      if (isWindowDim) {
+        if (!selectedEntityId) return;
+        const entity = room.entities[selectedEntityId];
+        if (!entity || entity.kind !== "wall-opening") return;
+        const n = Number(raw.trim());
+        if (!Number.isFinite(n) || n <= 0) return;
+        const we = entity as WallOpeningEntity;
+
+        let updated: WallOpeningEntity;
+        if (segIndex === WIN_DIM_LEFT_SEG || segIndex === WIN_DIM_RIGHT_SEG) {
+          const side = segIndex === WIN_DIM_LEFT_SEG ? "left" : "right";
+          updated = repositionWindowByDim(room, we, side, n);
+        } else if (segIndex === WIN_DIM_ELEV_SILL_SEG) {
+          const clamped = Math.max(0, Math.min(room.wallHeight - we.heightMm, n));
+          updated = { ...we, sillHeightMm: clamped };
+        } else {
+          const maxH = room.wallHeight - (we.sillHeightMm ?? 0);
+          const clamped = Math.max(100, Math.min(maxH, n));
+          updated = { ...we, heightMm: clamped };
+        }
+
+        const before = room;
+        const after = { ...room, entities: { ...room.entities, [updated.id]: updated } };
+        commitSnapshot(before, after);
+      } else {
+        commitWallDimEdit(segIndex, raw);
+      }
+    },
+    [commitWallDimEdit, selectedEntityId, room, commitSnapshot],
+  );
 
   // Pointer interactions: pan, zoom, wall drag, hover highlight
   useViewport2DInteractions({
