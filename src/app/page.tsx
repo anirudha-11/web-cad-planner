@@ -1,6 +1,9 @@
 "use client";
 
 import EditorViewport2D from "./components/EditorViewport2D";
+import Toolbar from "./components/Toolbar";
+import HatchSidebar from "./components/HatchSidebar";
+import { useTool } from "./state/ToolContext";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 
@@ -16,63 +19,69 @@ function Handle({ vertical }: { vertical: boolean }) {
 }
 
 export default function Home() {
+  const { mode } = useTool();
+
   return (
-    <div className="w-screen h-screen bg-black p-1">
-      <Group orientation="vertical">
-        {/* Top: Plan */}
-        <Panel defaultSize={55} minSize={20}>
-          <ViewportShell title="PLAN">
-            <EditorViewport2D view="plan" title="PLAN" />
-          </ViewportShell>
-        </Panel>
+    <div className="w-screen h-screen bg-black flex">
+      <Toolbar />
+      {mode === "hatch" && <HatchSidebar />}
+      <div className="flex-1 p-1 min-w-0">
+        <Group orientation="vertical">
+          {/* Top: Plan */}
+          <Panel defaultSize={55} minSize={20}>
+            <ViewportShell title="PLAN">
+              <EditorViewport2D view="plan" title="PLAN" />
+            </ViewportShell>
+          </Panel>
 
-        <Handle vertical={false} />
+          <Handle vertical={false} />
 
-        {/* Bottom: 4 elevations */}
-        <Panel defaultSize={45} minSize={15}>
-          <Group orientation="vertical">
-            {/* Row 1 */}
-            <Panel defaultSize={50} minSize={10}>
-              <Group orientation="horizontal">
-                <Panel defaultSize={50} minSize={10}>
-                  <ViewportShell title="ELEVATION NORTH">
-                    <EditorViewport2D view="north" title="ELEVATION NORTH" />
-                  </ViewportShell>
-                </Panel>
+          {/* Bottom: 4 elevations */}
+          <Panel defaultSize={45} minSize={15}>
+            <Group orientation="vertical">
+              {/* Row 1 */}
+              <Panel defaultSize={50} minSize={10}>
+                <Group orientation="horizontal">
+                  <Panel defaultSize={50} minSize={10}>
+                    <ViewportShell title="ELEVATION NORTH">
+                      <EditorViewport2D view="north" title="ELEVATION NORTH" />
+                    </ViewportShell>
+                  </Panel>
 
-                <Handle vertical={true} />
+                  <Handle vertical={true} />
 
-                <Panel defaultSize={50} minSize={10}>
-                  <ViewportShell title="ELEVATION EAST">
-                    <EditorViewport2D view="east" title="ELEVATION EAST" />
-                  </ViewportShell>
-                </Panel>
-              </Group>
-            </Panel>
+                  <Panel defaultSize={50} minSize={10}>
+                    <ViewportShell title="ELEVATION EAST">
+                      <EditorViewport2D view="east" title="ELEVATION EAST" />
+                    </ViewportShell>
+                  </Panel>
+                </Group>
+              </Panel>
 
-            <Handle vertical={false} />
+              <Handle vertical={false} />
 
-            {/* Row 2 */}
-            <Panel defaultSize={50} minSize={10}>
-              <Group orientation="horizontal">
-                <Panel defaultSize={50} minSize={10}>
-                  <ViewportShell title="ELEVATION SOUTH">
-                    <EditorViewport2D view="south" title="ELEVATION SOUTH" />
-                  </ViewportShell>
-                </Panel>
+              {/* Row 2 */}
+              <Panel defaultSize={50} minSize={10}>
+                <Group orientation="horizontal">
+                  <Panel defaultSize={50} minSize={10}>
+                    <ViewportShell title="ELEVATION SOUTH">
+                      <EditorViewport2D view="south" title="ELEVATION SOUTH" />
+                    </ViewportShell>
+                  </Panel>
 
-                <Handle vertical={true} />
+                  <Handle vertical={true} />
 
-                <Panel defaultSize={50} minSize={10}>
-                  <ViewportShell title="ELEVATION WEST">
-                    <EditorViewport2D view="west" title="ELEVATION WEST" />
-                  </ViewportShell>
-                </Panel>
-              </Group>
-            </Panel>
-          </Group>
-        </Panel>
-      </Group>
+                  <Panel defaultSize={50} minSize={10}>
+                    <ViewportShell title="ELEVATION WEST">
+                      <EditorViewport2D view="west" title="ELEVATION WEST" />
+                    </ViewportShell>
+                  </Panel>
+                </Group>
+              </Panel>
+            </Group>
+          </Panel>
+        </Group>
+      </div>
     </div>
   );
 }

@@ -2,6 +2,16 @@ import type { EntityMap } from "../core/entities/entityTypes";
 
 export type Vec2 = { x: number; y: number };
 
+export type HatchAssignment = {
+  patternId: string;
+  color: string;
+  bgColor: string;
+  spacingMm: number;
+  lineWidthMm: number;
+  angleDeg: number;
+  opacity: number;
+};
+
 export type RoomModel = {
   id: string;
 
@@ -15,6 +25,8 @@ export type RoomModel = {
 
   // Future-proof: doors/windows/fixtures/annotations etc.
   entities: EntityMap;
+
+  hatches?: Record<string, HatchAssignment>;
 };
 
 

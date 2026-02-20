@@ -1,4 +1,4 @@
-import type { DraftPrimitive, DraftScene, StrokeStyle, polygon, dimension } from "./draftPrimitives";
+import type { DraftPrimitive, DraftScene, StrokeStyle, polygon, dimension, hatchFill } from "./draftPrimitives";
 import type { Viewport2D, Vec2 } from "./Viewport2D";
 
 export class CanvasRenderer2D {
@@ -33,6 +33,11 @@ export class CanvasRenderer2D {
 
     if (p.kind === "polygon") {
       this.drawPolygon(p);
+      return;
+    }
+
+    if (p.kind === "hatchFill") {
+      this.drawHatchFill(p);
       return;
     }
 
@@ -329,6 +334,117 @@ export class CanvasRenderer2D {
     ctx.fillStyle = color;
     ctx.fillText(text, 0, 0);
     ctx.restore();
+  }
+
+  // ── Hatch fill rendering ──
+
+  private drawHatchFill(h: hatchFill) {
+    const ctx = this.ctx;
+    ctx.save();
+
+    if (h.opacity < 1) ctx.globalAlpha = h.opacity;
+
+    ctx.beginPath();
+    this.pathLoop(h.outer);
+    if (h.holes) {
+      for (const hole of h.holes) this.pathLoop(hole);
+    }
+    ctx.clip("evenodd");
+
+    if (h.bgColor && h.bgColor !== "transparent") {
+      ctx.fillStyle = h.bgColor;
+      ctx.fill("evenodd");
+    }
+
+    if (h.patternId === "solid") {
+      ctx.fillStyle = h.color;
+      ctx.fill("evenodd");
+    } else if (h.patternId === "dots") {
+      this.drawDots(h);
+    } else if (h.patternId !== "none") {
+      this.drawHatchLines(h);
+    }
+
+    ctx.restore();
+  }
+
+  private screenBoundsOf(pts: Vec2[]) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      const s = this.viewport.worldToScreen(p);
+      minX = Math.min(minX, s.x);
+      minY = Math.min(minY, s.y);
+      maxX = Math.max(maxX, s.x);
+      maxY = Math.max(maxY, s.y);
+    }
+    return { minX, minY, maxX, maxY };
+  }
+
+  private hatchAngles(patternId: string, fallback: number): number[] {
+    switch (patternId) {
+      case "diagonal-right": return [45];
+      case "diagonal-left":  return [135];
+      case "crosshatch":     return [45, 135];
+      case "horizontal":     return [0];
+      case "vertical":       return [90];
+      case "grid":           return [0, 90];
+      default:               return [fallback];
+    }
+  }
+
+  private drawHatchLines(h: hatchFill) {
+    const bb = this.screenBoundsOf(h.outer);
+    const spacingPx = Math.max(4, h.spacingMm * this.viewport.scale);
+    const lineWidthPx = Math.max(0.5, h.lineWidthMm * this.viewport.scale);
+
+    const ctx = this.ctx;
+    ctx.strokeStyle = h.color;
+    ctx.lineWidth = lineWidthPx;
+    ctx.setLineDash([]);
+    ctx.lineCap = "butt";
+
+    const angles = this.hatchAngles(h.patternId, h.angleDeg);
+
+    for (const deg of angles) {
+      const rad = (deg * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const perpX = -sin;
+      const perpY = cos;
+
+      const cx = (bb.minX + bb.maxX) / 2;
+      const cy = (bb.minY + bb.maxY) / 2;
+      const diag = Math.hypot(bb.maxX - bb.minX, bb.maxY - bb.minY) * 0.75;
+      const count = Math.ceil(diag / spacingPx);
+
+      ctx.beginPath();
+      for (let i = -count; i <= count; i++) {
+        const off = i * spacingPx;
+        const px = cx + perpX * off;
+        const py = cy + perpY * off;
+        ctx.moveTo(px - cos * diag, py - sin * diag);
+        ctx.lineTo(px + cos * diag, py + sin * diag);
+      }
+      ctx.stroke();
+    }
+  }
+
+  private drawDots(h: hatchFill) {
+    const bb = this.screenBoundsOf(h.outer);
+    const spacingPx = Math.max(6, h.spacingMm * this.viewport.scale);
+    const radius = Math.max(1, h.lineWidthMm * this.viewport.scale * 0.8);
+
+    const ctx = this.ctx;
+    ctx.fillStyle = h.color;
+
+    ctx.beginPath();
+    for (let x = bb.minX; x <= bb.maxX; x += spacingPx) {
+      for (let y = bb.minY; y <= bb.maxY; y += spacingPx) {
+        ctx.moveTo(x + radius, y);
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+      }
+    }
+    ctx.fill();
   }
 }
 

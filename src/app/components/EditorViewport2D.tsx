@@ -1,13 +1,17 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Viewport2D } from "../editor2D/Viewport2D";
 import { CanvasRenderer2D } from "../editor2D/CanvasRenderer2D";
 import { useRoomHistory } from "../state/RoomHistoryContext";
+import { useTool } from "../state/ToolContext";
 import { deriveDraftScene } from "../core/projection/deriveDraftScene";
 import { getWorldBounds } from "../core/projection/getWorldBounds";
 import { getInnerLoopSegment } from "../editor2D/hitTestRoomEdges";
+import { getHatchZones, hitTestZone, buildHatchPrimitives } from "../core/hatch/hatchZones";
+import type { DraftPrimitive } from "../editor2D/draftPrimitives";
 import type { ViewKind } from "../core/view/ViewKind";
+import type { HatchAssignment } from "../model/RoomModel";
 import { useViewport2DInteractions } from "../editor2D/useViewport2DInteractions";
 import { useDimensionLabelEditing } from "../editor2D/useDimensionLabelEditing";
 
@@ -19,32 +23,63 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
   const [version, setVersion] = useState(0);
 
   const { room, execute, previewRoom, commitSnapshot, undo, redo, canUndo, canRedo } = useRoomHistory();
+  const { mode: toolMode, hatchConfig, hoverZoneId, setHoverZoneId } = useTool();
 
   const [hoverSeg, setHoverSeg] = useState<number | null>(null);
   const [selectedSeg, setSelectedSeg] = useState<number | null>(null);
 
-  // Derived scene from shared model + overlay highlight
+  // Local hover zone ID scoped to this viewport
+  const [localHoverZone, setLocalHoverZone] = useState<string | null>(null);
+
+  const activePreviewZone = toolMode === "hatch" ? localHoverZone : null;
+  const activePreviewConfig: HatchAssignment | null =
+    toolMode === "hatch" && activePreviewZone
+      ? {
+          patternId: hatchConfig.patternId,
+          color: hatchConfig.color,
+          bgColor: hatchConfig.bgColor,
+          spacingMm: hatchConfig.spacingMm,
+          lineWidthMm: hatchConfig.lineWidthMm,
+          angleDeg: hatchConfig.angleDeg,
+          opacity: hatchConfig.opacity,
+        }
+      : null;
+
+  // Derived scene: hatches first (lowest z), then base geometry, then overlays on top
   const scene = useMemo(() => {
     const base = deriveDraftScene(view, room);
-    if (view !== "plan") return base;
+    const hatchPrims = buildHatchPrimitives(view, room, activePreviewZone, activePreviewConfig);
 
-    const segIndex = hoverSeg ?? selectedSeg;
-    if (segIndex == null) return base;
+    const overlays: DraftPrimitive[] = [];
 
-    const { a, b } = getInnerLoopSegment(room, segIndex);
-
-    return {
-      primitives: [
-        ...base.primitives,
-        {
+    if (view === "plan") {
+      const segIndex = hoverSeg ?? selectedSeg;
+      if (segIndex != null && toolMode === "select") {
+        const { a, b } = getInnerLoopSegment(room, segIndex);
+        overlays.push({
           kind: "line" as const,
           a,
           b,
           stroke: { color: "rgba(0,120,255,0.85)", widthMm: 0.6 },
-        },
-      ],
-    };
-  }, [view, room, hoverSeg, selectedSeg]);
+        });
+      }
+    }
+
+    if (toolMode === "hatch" && activePreviewZone) {
+      const zones = getHatchZones(view, room);
+      const zone = zones.find((z) => z.id === activePreviewZone);
+      if (zone) {
+        overlays.push({
+          kind: "polyline" as const,
+          pts: zone.outer,
+          closed: true,
+          stroke: { color: "rgba(59,130,246,0.7)", widthMm: 2, dashMm: [20, 15] },
+        });
+      }
+    }
+
+    return { primitives: [...hatchPrims, ...base.primitives, ...overlays] };
+  }, [view, room, hoverSeg, selectedSeg, toolMode, activePreviewZone, activePreviewConfig]);
 
   // Dimension label double-click + inline editor (plan view)
   const { dimEdit, setDimEdit, commitDimEdit } = useDimensionLabelEditing({
@@ -67,7 +102,69 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
     setHoverSeg,
     setSelectedSeg,
     onViewportChange: () => setVersion((v) => v + 1),
+    toolMode,
   });
+
+  // ── Hatch tool interactions ──
+  const applyHatch = useCallback(
+    (zoneId: string) => {
+      const assignment: HatchAssignment = {
+        patternId: hatchConfig.patternId,
+        color: hatchConfig.color,
+        bgColor: hatchConfig.bgColor,
+        spacingMm: hatchConfig.spacingMm,
+        lineWidthMm: hatchConfig.lineWidthMm,
+        angleDeg: hatchConfig.angleDeg,
+        opacity: hatchConfig.opacity,
+      };
+      const before = room;
+      const prevHatches = { ...(room.hatches ?? {}) };
+      prevHatches[zoneId] = assignment;
+      const after = { ...room, hatches: prevHatches };
+      commitSnapshot(before, after);
+    },
+    [room, hatchConfig, commitSnapshot],
+  );
+
+  useEffect(() => {
+    if (toolMode !== "hatch") {
+      setLocalHoverZone(null);
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const zones = getHatchZones(view, room);
+
+    const onMove = (e: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const world = viewport.screenToWorld({ x: sx, y: sy });
+      const hit = hitTestZone(world, zones);
+      setLocalHoverZone(hit ? hit.id : null);
+      canvas.style.cursor = hit ? "crosshair" : "default";
+    };
+
+    const onClick = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      const rect = canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const world = viewport.screenToWorld({ x: sx, y: sy });
+      const hit = hitTestZone(world, zones);
+      if (hit) applyHatch(hit.id);
+    };
+
+    canvas.addEventListener("pointermove", onMove);
+    canvas.addEventListener("pointerdown", onClick);
+    return () => {
+      canvas.removeEventListener("pointermove", onMove);
+      canvas.removeEventListener("pointerdown", onClick);
+      canvas.style.cursor = "default";
+    };
+  }, [toolMode, canvasRef, viewport, view, room, applyHatch]);
 
   const zoomExtents = () => {
     const canvas = canvasRef.current;

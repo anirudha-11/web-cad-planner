@@ -16,7 +16,6 @@ function derivePlanScene(room: RoomModel): DraftScene {
 
   const outer = offsetOrthoLoop(inner, t);
 
-  const wallFill = "rgb(255, 255, 255)";
   const outline = "rgba(0,0,0,0.9)";
 
   const primitives: DraftScene["primitives"] = [
@@ -24,7 +23,6 @@ function derivePlanScene(room: RoomModel): DraftScene {
       kind: "polygon" as const,
       outer,
       holes: [inner],
-      fill: { color: wallFill },
       strokeOuter: { color: outline, widthMm: 5 },
       strokeHoles: { color: outline, widthMm: 5 },
     },
@@ -79,7 +77,7 @@ function bounds(loop: Vec2[]) {
  *   Edge going DOWN  (+Y) → outward normal (+1,  0) = EAST
  *   Edge going UP    (-Y) → outward normal (-1,  0) = WEST
  */
-function edgeFacesDirection(
+export function edgeFacesDirection(
   loop: Vec2[],
   edgeIdx: number,
   dir: Exclude<ViewKind, "plan">,
@@ -102,7 +100,7 @@ function edgeFacesDirection(
  * Find horizontal positions (in elevation coords) of return walls—
  * perpendicular edges that connect two facing segments at different depths.
  */
-function findElevationReturns(
+export function findElevationReturns(
   loop: Vec2[],
   view: Exclude<ViewKind, "plan">,
   originH: number,
@@ -152,8 +150,7 @@ function deriveElevationScene(
   const primitives: DraftScene["primitives"] = [];
 
   // ── wall cross-section: outer boundary with inner-face hole ──
-  // The filled ring shows wall thickness at left/right edges,
-  // mirroring the plan-view wall rendering.
+  // Stroke-only; the hatch system provides the fill (default diagonal + white bg).
   primitives.push({
     kind: "polygon" as const,
     outer: [
@@ -170,25 +167,24 @@ function deriveElevationScene(
         { x: 0, y: H },
       ],
     ],
-    fill: { color: "rgb(255, 255, 255)" },
     strokeOuter: { color: outline, widthMm: 5 },
     strokeHoles: { color: outline, widthMm: 5 },
   });
 
   // ── tile band at floor level (bottom of elevation, y = H-tileH … H) ──
-  const tileH = Math.min(1200, H);
-  primitives.push({
-    kind: "polyline" as const,
-    pts: [
-      { x: 0, y: H - tileH },
-      { x: L, y: H - tileH },
-      { x: L, y: H },
-      { x: 0, y: H },
-    ],
-    closed: true,
-    fill: { color: "rgba(0, 0, 0, 0.08)" },
-    stroke: { color: "rgba(0, 0, 0, 0.18)", widthMm: 0.13 },
-  });
+  // const tileH = Math.min(1200, H);
+  // primitives.push({
+  //   kind: "polyline" as const,
+  //   pts: [
+  //     { x: 0, y: H - tileH },
+  //     { x: L, y: H - tileH },
+  //     { x: L, y: H },
+  //     { x: 0, y: H },
+  //   ],
+  //   closed: true,
+  //   fill: { color: "rgba(0, 0, 0, 0.08)" },
+  //   stroke: { color: "rgba(0, 0, 0, 0.18)", widthMm: 0.13 },
+  // });
 
   // ── return-wall vertical lines for non-rectangular rooms ──
   const returns = findElevationReturns(inner, view, originH, L);

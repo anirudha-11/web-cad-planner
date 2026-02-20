@@ -15,6 +15,7 @@ type UseViewport2DInteractionsArgs = {
   setHoverSeg: (segIndex: number | null) => void;
   setSelectedSeg: (segIndex: number | null) => void;
   onViewportChange?: () => void;
+  toolMode?: string;
 };
 
 export function useViewport2DInteractions({
@@ -27,6 +28,7 @@ export function useViewport2DInteractions({
   setHoverSeg,
   setSelectedSeg,
   onViewportChange,
+  toolMode = "select",
 }: UseViewport2DInteractionsArgs) {
   const dragRef = useRef<{
     segIndex: number;
@@ -77,7 +79,7 @@ export function useViewport2DInteractions({
         return;
       }
 
-      if (e.button === 0 && view === "plan") {
+      if (e.button === 0 && view === "plan" && toolMode === "select") {
         const pWorld = screenToWorldFromEvent(e);
         const tolMm = mmToleranceFromPx(10);
 
@@ -172,7 +174,7 @@ export function useViewport2DInteractions({
         return;
       }
 
-      if (view === "plan") {
+      if (view === "plan" && toolMode === "select") {
         const pWorld = screenToWorldFromEvent(e);
         const tolMm = mmToleranceFromPx(10);
 
@@ -186,7 +188,7 @@ export function useViewport2DInteractions({
           const horizontal = Math.abs(a.y - b.y) <= Math.abs(a.x - b.x);
           canvas.style.cursor = horizontal ? "ns-resize" : "ew-resize";
         }
-      } else {
+      } else if (toolMode === "select") {
         canvas.style.cursor = "default";
       }
     };
@@ -227,6 +229,6 @@ export function useViewport2DInteractions({
       canvas.removeEventListener("pointercancel", onPointerUp);
       canvas.style.cursor = "default";
     };
-  }, [canvasRef, viewport, view, room, previewRoom, commitSnapshot, setHoverSeg, setSelectedSeg, onViewportChange]);
+  }, [canvasRef, viewport, view, room, previewRoom, commitSnapshot, setHoverSeg, setSelectedSeg, onViewportChange, toolMode]);
 }
 

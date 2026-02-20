@@ -46,6 +46,20 @@ export type dimension = {
   arrowSizeMm?: number; // arrowhead size
 };
 
-export type DraftPrimitive = line | polyline | text | polygon | dimension;
+export type hatchFill = {
+  kind: "hatchFill";
+  zoneId: string;
+  outer: Vec2[];
+  holes?: Vec2[][];
+  patternId: string;
+  color: string;
+  bgColor?: string;
+  spacingMm: number;
+  lineWidthMm: number;
+  angleDeg: number;
+  opacity: number;
+};
+
+export type DraftPrimitive = line | polyline | text | polygon | dimension | hatchFill;
 
 
