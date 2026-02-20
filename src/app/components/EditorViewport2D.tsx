@@ -15,7 +15,9 @@ import type { HatchAssignment } from "../model/RoomModel";
 import { useViewport2DInteractions } from "../editor2D/useViewport2DInteractions";
 import { useDimensionLabelEditing } from "../editor2D/useDimensionLabelEditing";
 import { useWindowInteractions, WIN_DIM_LEFT_SEG, WIN_DIM_RIGHT_SEG, WIN_DIM_ELEV_SILL_SEG, WIN_DIM_ELEV_HEIGHT_SEG } from "../editor2D/useWindowInteractions";
+import { useDoorInteractions, DOOR_DIM_LEFT_SEG, DOOR_DIM_RIGHT_SEG, DOOR_DIM_ELEV_HEIGHT_SEG } from "../editor2D/useDoorInteractions";
 import { repositionWindowByDim } from "../core/entities/windowGeometry";
+import { repositionDoorByDim } from "../core/entities/doorGeometry";
 import type { WallOpeningEntity } from "../core/entities/entityTypes";
 
 export type { ViewKind };
@@ -26,7 +28,7 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
   const [version, setVersion] = useState(0);
 
   const { room, execute, previewRoom, commitSnapshot, undo, redo, canUndo, canRedo } = useRoomHistory();
-  const { mode: toolMode, setMode, hatchConfig, hoverZoneId, setHoverZoneId, zoomExtentsTrigger, windowConfig, selectedEntityId, setSelectedEntityId } = useTool();
+  const { mode: toolMode, setMode, hatchConfig, hoverZoneId, setHoverZoneId, zoomExtentsTrigger, windowConfig, doorConfig, selectedEntityId, setSelectedEntityId } = useTool();
 
   const [hoverSeg, setHoverSeg] = useState<number | null>(null);
   const [selectedSeg, setSelectedSeg] = useState<number | null>(null);
@@ -35,7 +37,7 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
   const [localHoverZone, setLocalHoverZone] = useState<string | null>(null);
 
   // ── Window tool interactions ──
-  const { previewPrimitives: windowPreviewPrims, cancelPendingDeselect } = useWindowInteractions({
+  const { previewPrimitives: windowPreviewPrims, cancelPendingDeselect: cancelWindowDeselect } = useWindowInteractions({
     canvasRef,
     viewport,
     view,
@@ -49,6 +51,27 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
     setMode,
     onViewportChange: () => setVersion((v) => v + 1),
   });
+
+  // ── Door tool interactions ──
+  const { previewPrimitives: doorPreviewPrims, cancelPendingDeselect: cancelDoorDeselect } = useDoorInteractions({
+    canvasRef,
+    viewport,
+    view,
+    room,
+    commitSnapshot,
+    previewRoom,
+    toolMode,
+    doorConfig,
+    selectedEntityId,
+    setSelectedEntityId,
+    setMode,
+    onViewportChange: () => setVersion((v) => v + 1),
+  });
+
+  const cancelPendingDeselect = useCallback(() => {
+    cancelWindowDeselect();
+    cancelDoorDeselect();
+  }, [cancelWindowDeselect, cancelDoorDeselect]);
 
   const activePreviewZone = toolMode === "hatch" ? localHoverZone : null;
   const activePreviewConfig: HatchAssignment | null =
@@ -97,8 +120,8 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
       }
     }
 
-    return { primitives: [...hatchPrims, ...base.primitives, ...overlays, ...windowPreviewPrims] };
-  }, [view, room, hoverSeg, selectedSeg, toolMode, activePreviewZone, activePreviewConfig, windowPreviewPrims]);
+    return { primitives: [...hatchPrims, ...base.primitives, ...overlays, ...windowPreviewPrims, ...doorPreviewPrims] };
+  }, [view, room, hoverSeg, selectedSeg, toolMode, activePreviewZone, activePreviewConfig, windowPreviewPrims, doorPreviewPrims]);
 
   // Dimension label double-click + inline editor
   const { dimEdit, setDimEdit, commitDimEdit: commitWallDimEdit } = useDimensionLabelEditing({
@@ -118,6 +141,11 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
         segIndex === WIN_DIM_RIGHT_SEG ||
         segIndex === WIN_DIM_ELEV_SILL_SEG ||
         segIndex === WIN_DIM_ELEV_HEIGHT_SEG;
+
+      const isDoorDim =
+        segIndex === DOOR_DIM_LEFT_SEG ||
+        segIndex === DOOR_DIM_RIGHT_SEG ||
+        segIndex === DOOR_DIM_ELEV_HEIGHT_SEG;
 
       if (isWindowDim) {
         if (!selectedEntityId) return;
@@ -142,6 +170,34 @@ export default function EditorViewport2D({ view, title }: { view: ViewKind; titl
 
         const before = room;
         const after = { ...room, entities: { ...room.entities, [updated.id]: updated } };
+        commitSnapshot(before, after);
+      } else if (isDoorDim) {
+        if (!selectedEntityId) return;
+        const entity = room.entities[selectedEntityId];
+        if (!entity || entity.kind !== "wall-opening") return;
+        const n = Number(raw.trim());
+        if (!Number.isFinite(n) || n <= 0) return;
+        const we = entity as WallOpeningEntity;
+
+        let updated: WallOpeningEntity;
+        if (segIndex === DOOR_DIM_LEFT_SEG || segIndex === DOOR_DIM_RIGHT_SEG) {
+          const side = segIndex === DOOR_DIM_LEFT_SEG ? "left" : "right";
+          updated = repositionDoorByDim(room, we, side, n);
+        } else {
+          const maxH = room.wallHeight;
+          const clamped = Math.max(100, Math.min(maxH, n));
+          updated = { ...we, heightMm: clamped };
+        }
+
+        const before = room;
+        const after = { ...room, entities: { ...room.entities, [updated.id]: updated } };
+        commitSnapshot(before, after);
+      } else if (segIndex === -1) {
+        const n = Number(raw.trim());
+        if (!Number.isFinite(n) || n <= 0) return;
+        const clamped = Math.max(100, n);
+        const before = room;
+        const after = { ...before, wallHeight: clamped };
         commitSnapshot(before, after);
       } else {
         commitWallDimEdit(segIndex, raw);

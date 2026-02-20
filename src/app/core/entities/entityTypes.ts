@@ -15,6 +15,9 @@ export type EntityBase = {
 };
 
 export type WindowStyle = "single-leaf" | "double-leaf" | "fixed" | "sliding";
+export type DoorStyle = "single-leaf" | "double-leaf" | "sliding" | "pocket";
+export type DoorLeafSide = "left" | "right";
+export type DoorSwingDirection = "inside" | "outside";
 
 export type WallOpeningEntity = EntityBase & {
   kind: "wall-opening";
@@ -24,6 +27,9 @@ export type WallOpeningEntity = EntityBase & {
   heightMm: number;
   sillHeightMm?: number;
   windowStyle?: WindowStyle;
+  doorStyle?: DoorStyle;
+  doorLeafSide?: DoorLeafSide;
+  doorSwingDirection?: DoorSwingDirection;
 };
 
 export type FixtureEntity = EntityBase & {

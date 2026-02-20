@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { HatchConfig, HatchPatternId } from "../core/hatch/hatchPatterns";
 import { defaultConfigFor } from "../core/hatch/hatchPatterns";
-import type { WindowStyle } from "../core/entities/entityTypes";
+import type { WindowStyle, DoorStyle, DoorLeafSide, DoorSwingDirection } from "../core/entities/entityTypes";
 
 export type WindowConfig = {
   widthMm: number;
@@ -12,7 +12,15 @@ export type WindowConfig = {
   windowStyle: WindowStyle;
 };
 
-export type ToolMode = "select" | "hatch" | "window";
+export type DoorConfig = {
+  widthMm: number;
+  heightMm: number;
+  doorStyle: DoorStyle;
+  leafSide: DoorLeafSide;
+  swingDirection: DoorSwingDirection;
+};
+
+export type ToolMode = "select" | "hatch" | "window" | "door";
 
 type ToolContextValue = {
   mode: ToolMode;
@@ -26,6 +34,8 @@ type ToolContextValue = {
   requestZoomExtents: () => void;
   windowConfig: WindowConfig;
   setWindowConfig: (config: WindowConfig | ((prev: WindowConfig) => WindowConfig)) => void;
+  doorConfig: DoorConfig;
+  setDoorConfig: (config: DoorConfig | ((prev: DoorConfig) => DoorConfig)) => void;
   selectedEntityId: string | null;
   setSelectedEntityId: (id: string | null) => void;
 };
@@ -43,12 +53,19 @@ export function ToolProvider({ children }: { children: React.ReactNode }) {
     sillHeightMm: 900,
     windowStyle: "single-leaf",
   });
+  const [doorConfig, setDoorConfig] = useState<DoorConfig>({
+    widthMm: 900,
+    heightMm: 2100,
+    doorStyle: "single-leaf",
+    leafSide: "left",
+    swingDirection: "inside",
+  });
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
 
   const setMode = useCallback((m: ToolMode) => {
     setModeRaw(m);
     if (m !== "hatch") setHoverZoneId(null);
-    if (m !== "select" && m !== "window") setSelectedEntityId(null);
+    if (m !== "select" && m !== "window" && m !== "door") setSelectedEntityId(null);
   }, []);
 
   const selectPattern = useCallback(
@@ -69,8 +86,8 @@ export function ToolProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<ToolContextValue>(
-    () => ({ mode, setMode, hatchConfig, setHatchConfig, selectPattern, hoverZoneId, setHoverZoneId, zoomExtentsTrigger, requestZoomExtents, windowConfig, setWindowConfig, selectedEntityId, setSelectedEntityId }),
-    [mode, setMode, hatchConfig, selectPattern, hoverZoneId, zoomExtentsTrigger, requestZoomExtents, windowConfig, selectedEntityId],
+    () => ({ mode, setMode, hatchConfig, setHatchConfig, selectPattern, hoverZoneId, setHoverZoneId, zoomExtentsTrigger, requestZoomExtents, windowConfig, setWindowConfig, doorConfig, setDoorConfig, selectedEntityId, setSelectedEntityId }),
+    [mode, setMode, hatchConfig, selectPattern, hoverZoneId, zoomExtentsTrigger, requestZoomExtents, windowConfig, doorConfig, selectedEntityId],
   );
 
   return <ToolContext.Provider value={value}>{children}</ToolContext.Provider>;
