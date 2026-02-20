@@ -1,7 +1,8 @@
 import type { RoomModel } from "../../model/RoomModel";
 import type { ViewKind } from "../view/ViewKind";
+import type { Vec2 } from "../geometry/vec2";
+import { bounds } from "../geometry/boundsUtils";
 
-type Vec2 = { x: number; y: number };
 export type Bounds2D = { min: Vec2; max: Vec2 };
 
 export function getWorldBounds(view: ViewKind, room: RoomModel): Bounds2D {
@@ -28,19 +29,5 @@ export function getWorldBounds(view: ViewKind, room: RoomModel): Bounds2D {
     min: { x: -T - marginX, y: -marginY },
     max: { x: L + T + marginX, y: H + marginY },
   };
-}
-
-function bounds(loop: Vec2[]) {
-  let minX = Infinity,
-    minY = Infinity,
-    maxX = -Infinity,
-    maxY = -Infinity;
-  for (const p of loop) {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
-  }
-  return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
 }
 

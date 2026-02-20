@@ -1,4 +1,5 @@
-export type Vec2 = { x: number; y: number };
+export type { Vec2 } from "../core/geometry/vec2";
+import type { Vec2 } from "../core/geometry/vec2";
 
 export class Viewport2D {
   // world mm → screen px: screen = (world - origin) * scale

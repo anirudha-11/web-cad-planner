@@ -1,29 +1,10 @@
-import type { RoomModel, Vec2 } from "../../model/RoomModel";
+import type { RoomModel } from "../../model/RoomModel";
+import type { Vec2 } from "../geometry/vec2";
 import type { WallOpeningEntity, EntityId } from "./entityTypes";
 import type { ViewKind } from "../view/ViewKind";
-import { edgeFacesDirection } from "../projection/deriveDraftScene";
-
-// ── Segment helpers (same as windowGeometry) ──
-
-function segEndpoints(room: RoomModel, segIdx: number): { a: Vec2; b: Vec2 } {
-  const loop = room.innerLoop;
-  const n = loop.length;
-  return { a: loop[segIdx], b: loop[(segIdx + 1) % n] };
-}
-
-function segLen(a: Vec2, b: Vec2): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
-function segDir(a: Vec2, b: Vec2): Vec2 {
-  const l = segLen(a, b);
-  if (l < 1e-9) return { x: 1, y: 0 };
-  return { x: (b.x - a.x) / l, y: (b.y - a.y) / l };
-}
-
-function outwardNormal(dir: Vec2): Vec2 {
-  return { x: dir.y, y: -dir.x };
-}
+import { edgeFacesDirection } from "../geometry/elevationUtils";
+import { segEndpoints, segLen, segDir, outwardNormal } from "../geometry/segmentUtils";
+import { pointInQuad } from "../geometry/polygonUtils";
 
 // ── Plan rectangle ──
 
@@ -186,35 +167,6 @@ export function hitTestDoorsElevation(
   return null;
 }
 
-function pointInQuad(p: Vec2, corners: Vec2[], tol: number): boolean {
-  const expanded = expandQuad(corners, tol);
-  return pointInPolygon(p, expanded);
-}
-
-function expandQuad(corners: Vec2[], tol: number): Vec2[] {
-  const cx = corners.reduce((s, c) => s + c.x, 0) / corners.length;
-  const cy = corners.reduce((s, c) => s + c.y, 0) / corners.length;
-  return corners.map((c) => {
-    const dx = c.x - cx;
-    const dy = c.y - cy;
-    const d = Math.hypot(dx, dy);
-    if (d < 1e-9) return c;
-    return { x: c.x + (dx / d) * tol, y: c.y + (dy / d) * tol };
-  });
-}
-
-function pointInPolygon(p: Vec2, poly: Vec2[]): boolean {
-  let inside = false;
-  const n = poly.length;
-  for (let i = 0, j = n - 1; i < n; j = i++) {
-    const xi = poly[i].x, yi = poly[i].y;
-    const xj = poly[j].x, yj = poly[j].y;
-    if ((yi > p.y) !== (yj > p.y) && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
 
 // ── Reposition by dimension value ──
 

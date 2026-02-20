@@ -1,4 +1,4 @@
-import type { DraftPrimitive, DraftScene, StrokeStyle, polygon, dimension } from "./draftPrimitives";
+import type { DraftPrimitive, DraftScene, StrokeStyle, polygon, dimension } from "../core/rendering/draftPrimitives";
 import type { Viewport2D, Vec2 } from "./Viewport2D";
 import { drawHatchFill } from "../core/hatch/hatchRenderer";
 

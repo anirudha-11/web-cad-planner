@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import type { ViewKind } from "../core/view/ViewKind";
-import type { DraftPrimitive } from "./draftPrimitives";
+import type { DraftPrimitive } from "../core/rendering/draftPrimitives";
 import type { RoomModel } from "../model/RoomModel";
 import type { Viewport2D } from "./Viewport2D";
 import type { Command } from "../core/commands/Command";
 import { createCommitDimEditCommand } from "../core/commands/roomCommands";
 
-type Vec2 = { x: number; y: number };
-type ScreenPt = { x: number; y: number };
+import type { Vec2 } from "../core/geometry/vec2";
+type ScreenPt = Vec2;
 
 export type DimEditState = {
   segIndex: number;

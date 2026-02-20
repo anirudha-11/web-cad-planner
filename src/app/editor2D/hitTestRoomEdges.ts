@@ -1,6 +1,5 @@
 import type { RoomModel } from "../model/RoomModel";
-
-export type Vec2 = { x: number; y: number };
+import type { Vec2 } from "../core/geometry/vec2";
 
 export type SegmentHit = {
   segIndex: number; // segment i -> i+1 (wraps)

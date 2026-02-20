@@ -1,6 +1,8 @@
 import type { EntityMap } from "../core/entities/entityTypes";
+import type { Vec2 } from "../core/geometry/vec2";
+import { bounds as _bounds } from "../core/geometry/boundsUtils";
 
-export type Vec2 = { x: number; y: number };
+export type { Vec2 } from "../core/geometry/vec2";
 
 export type HatchAssignment = {
   patternId: string;
@@ -64,14 +66,4 @@ export const createDefaultRoom = (): RoomModel => {
   };
 };
 
-// Helpers (optional, used later for UI)
-export function innerBounds(loop: Vec2[]) {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of loop) {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
-  }
-  return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
-}
+export const innerBounds = _bounds;

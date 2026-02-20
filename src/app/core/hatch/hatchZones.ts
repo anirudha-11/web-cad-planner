@@ -1,8 +1,11 @@
-import type { Vec2, RoomModel, HatchAssignment } from "../../model/RoomModel";
+import type { RoomModel, HatchAssignment } from "../../model/RoomModel";
+import type { Vec2 } from "../geometry/vec2";
+import { bounds } from "../geometry/boundsUtils";
+import { pointInPolygon } from "../geometry/polygonUtils";
 import type { ViewKind } from "../view/ViewKind";
-import type { hatchFill } from "../../editor2D/draftPrimitives";
-import { offsetOrthoLoop } from "../../editor2D/offsetOrthoLoop";
-import { edgeFacesDirection, findElevationReturns } from "../projection/deriveDraftScene";
+import type { hatchFill } from "../rendering/draftPrimitives";
+import { offsetOrthoLoop } from "../geometry/offsetOrthoLoop";
+import { edgeFacesDirection, findElevationReturns } from "../geometry/elevationUtils";
 
 export type HatchZone = {
   id: string;
@@ -114,18 +117,6 @@ export function hitTestZone(
   return null;
 }
 
-function pointInPolygon(p: Vec2, poly: Vec2[]): boolean {
-  let inside = false;
-  const n = poly.length;
-  for (let i = 0, j = n - 1; i < n; j = i++) {
-    const xi = poly[i].x, yi = poly[i].y;
-    const xj = poly[j].x, yj = poly[j].y;
-    if ((yi > p.y) !== (yj > p.y) && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
 
 // ── Primitive generation ──
 
@@ -189,13 +180,3 @@ function rect(x0: number, y0: number, x1: number, y1: number): Vec2[] {
   ];
 }
 
-function bounds(loop: Vec2[]) {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of loop) {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
-  }
-  return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
-}

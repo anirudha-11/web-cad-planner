@@ -1,4 +1,4 @@
-import type { hatchFill } from "../../editor2D/draftPrimitives";
+import type { hatchFill } from "../rendering/draftPrimitives";
 import type { Viewport2D, Vec2 } from "../../editor2D/Viewport2D";
 
 function pathLoop(ctx: CanvasRenderingContext2D, viewport: Viewport2D, loop: Vec2[]): void {

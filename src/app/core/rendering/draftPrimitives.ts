@@ -1,6 +1,5 @@
-// import type { Vec2 } from "./Viewport2D";
-
-export type Vec2 = { x: number; y: number };
+import type { Vec2 } from "../geometry/vec2";
+export type { Vec2 } from "../geometry/vec2";
 
 export type StrokeStyle = {
   color: string;       // e.g. "#111827"
@@ -65,5 +64,3 @@ export type hatchFill = {
 };
 
 export type DraftPrimitive = line | polyline | text | polygon | dimension | hatchFill;
-
-
